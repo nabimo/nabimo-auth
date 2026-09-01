@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { authErrors } from "./errors.js";
 import { createAccessTokenClaims, DEFAULT_ACCESS_TOKEN_POLICY } from "./token-policy.js";
 import { createPasswordHash, verifyUserPassword } from "./password.js";
 import { normalizeEmail } from "./credentials.js";
@@ -35,7 +36,7 @@ export class AuthService {
   async registerWithPassword(emailInput: string, password: string) {
     const email = normalizeEmail(emailInput);
     const existing = await this.config.users.findByEmail(email);
-    if (existing) throw new Error("ACCOUNT_ALREADY_EXISTS");
+    if (existing) throw authErrors.accountAlreadyExists();
 
     const passwordHash = await createPasswordHash(password);
     const user = await this.config.users.create({ email, passwordHash });
@@ -45,7 +46,7 @@ export class AuthService {
   async loginWithPassword(emailInput: string, password: string) {
     const email = normalizeEmail(emailInput);
     const user = await this.config.users.findByEmail(email);
-    if (!user?.passwordHash) throw new Error("INVALID_CREDENTIALS");
+    if (!user?.passwordHash) throw authErrors.invalidCredentials();
 
     await verifyUserPassword(password, user.passwordHash);
     return this.createAuthenticationResult(user.id, user.email ?? email);
