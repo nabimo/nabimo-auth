@@ -10,7 +10,12 @@ export class PrismaRegistrationTransactionStore implements RegistrationTransacti
       if (existing) throw new Error("ACCOUNT_ALREADY_EXISTS");
 
       const user = await tx.user.create({
-        data: { email: input.email, passwordHash: input.passwordHash },
+        data: {
+          email: input.email,
+          passwordCredential: {
+            create: { passwordHash: input.passwordHash },
+          },
+        },
       });
 
       await tx.session.create({
