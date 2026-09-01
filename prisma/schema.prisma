@@ -1,6 +1,6 @@
 generator client {
   provider = "prisma-client"
-  output   = "../packages/database/generated"
+  output   = "../packages/database/src/generated"
 }
 
 datasource db {
@@ -63,10 +63,10 @@ model RefreshToken {
   id          String    @id @default(uuid())
   userId      String
   sessionId   String
-  tokenHash   String    @unique
+  tokenHash   String   @unique
   familyId    String
   expiresAt   DateTime
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
   usedAt      DateTime?
   revokedAt   DateTime?
   replacedBy  String?
@@ -82,7 +82,7 @@ model RefreshToken {
 }
 
 model Verification {
-  id          String           @id @default(uuid())
+  id          String           @id
   userId      String?
   type        VerificationType
   target      String
@@ -98,6 +98,14 @@ model Verification {
   @@index([target, type])
   @@index([userId, type])
   @@index([expiresAt])
+}
+
+enum VerificationType {
+  EMAIL_OTP
+  PHONE_OTP
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
 }
 
 model TwoFactor {
@@ -121,12 +129,4 @@ model RecoveryCode {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-}
-
-enum VerificationType {
-  EMAIL_OTP
-  PHONE_OTP
-  EMAIL_VERIFICATION
-  PHONE_VERIFICATION
-  PASSWORD_RESET
 }
