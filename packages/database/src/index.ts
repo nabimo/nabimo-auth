@@ -1,7 +1,7 @@
-import { PrismaClient } from "../generated/client";
+import { PrismaClient } from "../generated/client.js";
 
-export { PrismaClient } from "../generated/client";
-export * from "../generated/client";
+export { PrismaClient } from "../generated/client.js";
+export * from "../generated/client.js";
 export * from "./user-repository.js";
 export * from "./auth-transaction.js";
 export * from "./prisma-registration-store.js";
