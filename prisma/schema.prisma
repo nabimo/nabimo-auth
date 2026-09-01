@@ -3,6 +3,10 @@ generator client {
   output   = "../packages/database/generated"
 }
 
+datasource db {
+  provider = "postgresql"
+}
+
 model User {
   id             String   @id @default(uuid())
   email          String?  @unique
