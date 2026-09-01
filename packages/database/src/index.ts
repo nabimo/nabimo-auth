@@ -5,6 +5,7 @@ export * from "../generated/client";
 export * from "./user-repository.js";
 export * from "./auth-transaction.js";
 export * from "./prisma-registration-store.js";
+export * from "./prisma-session-store.js";
 
 let client: PrismaClient | undefined;
 
