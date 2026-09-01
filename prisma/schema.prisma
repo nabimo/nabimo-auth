@@ -28,12 +28,12 @@ model User {
 }
 
 model Identity {
-  id                String   @id @default(uuid())
-  userId            String
-  provider          String
+  id                 String   @id @default(uuid())
+  userId             String
+  provider           String
   providerAccountId  String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -42,41 +42,47 @@ model Identity {
 }
 
 model Session {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   userId      String
-  tokenHash   String   @unique
   expiresAt   DateTime
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   lastUsedAt  DateTime?
   revokedAt   DateTime?
   userAgent   String?
   ipAddress   String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokens RefreshToken[]
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([userId, revokedAt])
 }
 
 model RefreshToken {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   userId      String
-  tokenHash   String   @unique
+  sessionId   String
+  tokenHash   String    @unique
   familyId    String
   expiresAt   DateTime
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
   usedAt      DateTime?
   revokedAt   DateTime?
+  replacedBy  String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([sessionId])
   @@index([familyId])
+  @@index([familyId, revokedAt])
   @@index([expiresAt])
 }
 
 model Verification {
-  id          String    @id @default(uuid())
+  id          String           @id @default(uuid())
   userId      String?
   type        VerificationType
   target      String
@@ -84,8 +90,8 @@ model Verification {
   tokenHash   String?
   expiresAt   DateTime
   consumedAt  DateTime?
-  attempts    Int       @default(0)
-  createdAt   DateTime  @default(now())
+  attempts    Int              @default(0)
+  createdAt   DateTime         @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
