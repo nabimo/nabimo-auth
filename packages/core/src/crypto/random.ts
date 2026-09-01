@@ -13,11 +13,18 @@ export function randomToken(size = 32): string {
 }
 
 export function randomOtp(length = 6): string {
-  if (!Number.isInteger(length) || length < 4 || length > 10) {
-    throw new RangeError("OTP length must be between 4 and 10");
+  if (!Number.isInteger(length) || length < 4 || length > 9) {
+    throw new RangeError("OTP length must be between 4 and 9");
   }
 
-  const max = 10 ** length;
-  const value = randomBytesBuffer(4).readUInt32BE(0) % max;
-  return value.toString().padStart(length, "0");
+  const upperBound = 10 ** length;
+  const maxUint32 = 0x1_0000_0000;
+  const limit = maxUint32 - (maxUint32 % upperBound);
+
+  while (true) {
+    const value = randomBytesBuffer(4).readUInt32BE(0);
+    if (value < limit) {
+      return (value % upperBound).toString().padStart(length, "0");
+    }
+  }
 }
