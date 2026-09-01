@@ -1,41 +1,28 @@
 import { createRouter, eventHandler, readBody } from "h3";
+import { AuthService } from "@nabimo-auth/core";
 
-export const authRouter = createRouter();
+export interface AuthRouteDependencies {
+  auth: AuthService;
+}
 
-authRouter.post(
-  "/register",
-  eventHandler(async (event) => {
-    const body = await readBody<{ email?: string; password?: string }>(event);
+export function createAuthRouter({ auth }: AuthRouteDependencies) {
+  const router = createRouter();
 
-    if (!body?.email || !body.password) {
-      return {
-        error: "INVALID_REQUEST",
-        message: "Email and password are required",
-      };
+  router.post("/register", eventHandler(async (event) => {
+    const body = await readBody<{ email?: unknown; password?: unknown }>(event);
+    if (typeof body?.email !== "string" || typeof body?.password !== "string") {
+      return { error: "INVALID_REQUEST", message: "Email and password are required" };
     }
+    return auth.registerWithPassword(body.email, body.password);
+  }));
 
-    return {
-      error: "NOT_IMPLEMENTED",
-      message: "Registration service is not wired yet",
-    };
-  }),
-);
-
-authRouter.post(
-  "/login/password",
-  eventHandler(async (event) => {
-    const body = await readBody<{ email?: string; password?: string }>(event);
-
-    if (!body?.email || !body.password) {
-      return {
-        error: "INVALID_REQUEST",
-        message: "Email and password are required",
-      };
+  router.post("/login/password", eventHandler(async (event) => {
+    const body = await readBody<{ email?: unknown; password?: unknown }>(event);
+    if (typeof body?.email !== "string" || typeof body?.password !== "string") {
+      return { error: "INVALID_REQUEST", message: "Email and password are required" };
     }
+    return auth.loginWithPassword(body.email, body.password);
+  }));
 
-    return {
-      error: "NOT_IMPLEMENTED",
-      message: "Password authentication service is not wired yet",
-    };
-  }),
-);
+  return router;
+}
