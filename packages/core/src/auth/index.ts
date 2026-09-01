@@ -1,3 +1,4 @@
 export * from "./errors.js";
 export * from "./types.js";
 export * from "./password.js";
+export * from "./credentials.js";
