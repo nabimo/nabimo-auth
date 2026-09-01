@@ -1,0 +1,83 @@
+import { randomUUID } from "node:crypto";
+import { createAccessTokenClaims, DEFAULT_ACCESS_TOKEN_POLICY } from "./token-policy.js";
+import { createPasswordHash, verifyUserPassword } from "./password.js";
+import { normalizeEmail } from "./credentials.js";
+import { createSession, DEFAULT_SESSION_POLICY } from "../session/service.js";
+import { signAccessToken } from "../crypto/jwt.js";
+
+export interface AuthUserStore {
+  findByEmail(email: string): Promise<{ id: string; email: string | null; passwordHash: string | null } | null>;
+  create(input: { email: string; passwordHash: string }): Promise<{ id: string; email: string | null }>;
+}
+
+export interface SessionStore {
+  create(input: {
+    id: string;
+    userId: string;
+    familyId: string;
+    expiresAt: Date;
+    refreshTokenHash: string;
+  }): Promise<void>;
+}
+
+export interface AuthServiceConfig {
+  users: AuthUserStore;
+  sessions: SessionStore;
+  jwtPrivateKeyPem: string;
+  jwtKeyId: string;
+  issuer?: string;
+  audience?: string;
+}
+
+export class AuthService {
+  constructor(private readonly config: AuthServiceConfig) {}
+
+  async registerWithPassword(emailInput: string, password: string) {
+    const email = normalizeEmail(emailInput);
+    const existing = await this.config.users.findByEmail(email);
+    if (existing) throw new Error("ACCOUNT_ALREADY_EXISTS");
+
+    const passwordHash = await createPasswordHash(password);
+    const user = await this.config.users.create({ email, passwordHash });
+    return this.createAuthenticationResult(user.id, user.email ?? email);
+  }
+
+  async loginWithPassword(emailInput: string, password: string) {
+    const email = normalizeEmail(emailInput);
+    const user = await this.config.users.findByEmail(email);
+    if (!user?.passwordHash) throw new Error("INVALID_CREDENTIALS");
+
+    await verifyUserPassword(password, user.passwordHash);
+    return this.createAuthenticationResult(user.id, user.email ?? email);
+  }
+
+  private async createAuthenticationResult(userId: string, email: string) {
+    const session = createSession();
+    await this.config.sessions.create({
+      id: session.sessionId,
+      userId,
+      familyId: session.familyId,
+      expiresAt: session.expiresAt,
+      refreshTokenHash: session.refreshTokenHash,
+    });
+
+    const claims = createAccessTokenClaims(
+      userId,
+      session.sessionId,
+      randomUUID(),
+      Math.floor(Date.now() / 1000),
+      {
+        issuer: this.config.issuer ?? DEFAULT_ACCESS_TOKEN_POLICY.issuer,
+        audience: this.config.audience ?? DEFAULT_ACCESS_TOKEN_POLICY.audience,
+        ttlSeconds: DEFAULT_SESSION_POLICY.accessTokenTtlSeconds,
+      },
+    );
+
+    return {
+      user: { id: userId, email },
+      sessionId: session.sessionId,
+      accessToken: signAccessToken(claims, this.config.jwtPrivateKeyPem, this.config.jwtKeyId),
+      refreshToken: session.refreshToken,
+    };
+  }
+}
