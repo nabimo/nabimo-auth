@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Generated Prisma client
+packages/database/generated/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Build output
+.dist/
+dist/
+build/
+coverage/
+
+# Local databases / runtime data
+*.db
+*.sqlite
+*.sqlite3
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
