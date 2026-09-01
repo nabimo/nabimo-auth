@@ -1,0 +1,23 @@
+{
+  "name": "nabimo-auth",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source, self-hosted authentication infrastructure for web and mobile applications.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @nabimo-auth/server dev",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "format": "pnpm exec prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2"
+  }
+}
