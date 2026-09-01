@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@nabimo-auth/core": "workspace:*",
     "@prisma/client": "^7.10.0"
   },
   "devDependencies": {
