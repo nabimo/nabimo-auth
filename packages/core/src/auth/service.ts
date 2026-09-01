@@ -6,9 +6,19 @@ import { normalizeEmail } from "./credentials.js";
 import { createSession, DEFAULT_SESSION_POLICY } from "../session/service.js";
 import { signAccessToken } from "../crypto/jwt.js";
 
+export interface RegistrationTransactionStore {
+  registerUser(input: {
+    email: string;
+    passwordHash: string;
+    sessionId: string;
+    familyId: string;
+    refreshTokenHash: string;
+    sessionExpiresAt: Date;
+  }): Promise<{ id: string; email: string | null }>;
+}
+
 export interface AuthUserStore {
   findByEmail(email: string): Promise<{ id: string; email: string | null; passwordHash: string | null } | null>;
-  create(input: { email: string; passwordHash: string }): Promise<{ id: string; email: string | null }>;
 }
 
 export interface SessionStore {
@@ -24,6 +34,7 @@ export interface SessionStore {
 export interface AuthServiceConfig {
   users: AuthUserStore;
   sessions: SessionStore;
+  registration: RegistrationTransactionStore;
   jwtPrivateKeyPem: string;
   jwtKeyId: string;
   issuer?: string;
@@ -39,8 +50,17 @@ export class AuthService {
     if (existing) throw authErrors.accountAlreadyExists();
 
     const passwordHash = await createPasswordHash(password);
-    const user = await this.config.users.create({ email, passwordHash });
-    return this.createAuthenticationResult(user.id, user.email ?? email);
+    const session = createSession();
+    const user = await this.config.registration.registerUser({
+      email,
+      passwordHash,
+      sessionId: session.sessionId,
+      familyId: session.familyId,
+      refreshTokenHash: session.refreshTokenHash,
+      sessionExpiresAt: session.expiresAt,
+    });
+
+    return this.createAuthenticationResult(user.id, user.email ?? email, session);
   }
 
   async loginWithPassword(emailInput: string, password: string) {
@@ -49,19 +69,19 @@ export class AuthService {
     if (!user?.passwordHash) throw authErrors.invalidCredentials();
 
     await verifyUserPassword(password, user.passwordHash);
-    return this.createAuthenticationResult(user.id, user.email ?? email);
-  }
-
-  private async createAuthenticationResult(userId: string, email: string) {
     const session = createSession();
     await this.config.sessions.create({
       id: session.sessionId,
-      userId,
+      userId: user.id,
       familyId: session.familyId,
       expiresAt: session.expiresAt,
       refreshTokenHash: session.refreshTokenHash,
     });
 
+    return this.createAuthenticationResult(user.id, user.email ?? email, session);
+  }
+
+  private createAuthenticationResult(userId: string, email: string, session: ReturnType<typeof createSession>) {
     const claims = createAccessTokenClaims(
       userId,
       session.sessionId,
