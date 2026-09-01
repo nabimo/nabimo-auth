@@ -1,7 +1,4 @@
 import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
-
-const scrypt = promisify(scryptCallback);
 
 const VERSION = "scrypt-v1";
 const KEY_LENGTH = 64;
@@ -10,16 +7,36 @@ const COST = 65_536;
 const BLOCK_SIZE = 8;
 const PARALLELIZATION = 1;
 
+interface ScryptOptions {
+  N: number;
+  r: number;
+  p: number;
+  maxmem: number;
+}
+
+function scrypt(password: string, salt: Buffer, keyLength: number, options: ScryptOptions): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    scryptCallback(password, salt, keyLength, options, (error, derivedKey) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve(derivedKey);
+    });
+  });
+}
+
 export async function hashPassword(password: string): Promise<string> {
   assertPassword(password);
 
   const salt = randomBytes(SALT_LENGTH);
-  const derivedKey = (await scrypt(password, salt, KEY_LENGTH, {
+  const derivedKey = await scrypt(password, salt, KEY_LENGTH, {
     N: COST,
     r: BLOCK_SIZE,
     p: PARALLELIZATION,
     maxmem: 128 * COST * BLOCK_SIZE + 1024,
-  })) as Buffer;
+  });
 
   return [
     VERSION,
@@ -57,12 +74,12 @@ export async function verifyPassword(password: string, encoded: string): Promise
     return false;
   }
 
-  const derivedKey = (await scrypt(password, salt, KEY_LENGTH, {
+  const derivedKey = await scrypt(password, salt, KEY_LENGTH, {
     N: params.N,
     r: params.r,
     p: params.p,
     maxmem: 128 * params.N * params.r + 1024,
-  })) as Buffer;
+  });
 
   return timingSafeEqual(expected, derivedKey);
 }
