@@ -74,3 +74,5 @@ describe("TOTP", () => {
     expect(uri).toContain("issuer=Nabimo+Auth");
   });
 });
+
+// Keep the cryptographic test vectors explicit and deterministic.
