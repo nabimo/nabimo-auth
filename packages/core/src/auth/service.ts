@@ -18,7 +18,11 @@ export interface RegistrationTransactionStore {
 }
 
 export interface AuthUserStore {
-  findByEmail(email: string): Promise<{ id: string; email: string | null; passwordHash: string | null } | null>;
+  findByEmail(email: string): Promise<{
+    id: string;
+    email: string | null;
+    passwordCredential: { passwordHash: string } | null;
+  } | null>;
 }
 
 export interface SessionStore {
@@ -66,9 +70,10 @@ export class AuthService {
   async loginWithPassword(emailInput: string, password: string) {
     const email = normalizeEmail(emailInput);
     const user = await this.config.users.findByEmail(email);
-    if (!user?.passwordHash) throw authErrors.invalidCredentials();
+    const passwordHash = user?.passwordCredential?.passwordHash;
+    if (!passwordHash) throw authErrors.invalidCredentials();
 
-    await verifyUserPassword(password, user.passwordHash);
+    await verifyUserPassword(password, passwordHash);
     const session = createSession();
     await this.config.sessions.create({
       id: session.sessionId,
