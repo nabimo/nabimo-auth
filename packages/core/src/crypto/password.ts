@@ -6,6 +6,7 @@ const SALT_LENGTH = 16;
 const COST = 65_536;
 const BLOCK_SIZE = 8;
 const PARALLELIZATION = 1;
+const SCRYPT_MAXMEM = 256 * 1024 * 1024;
 
 interface ScryptOptions {
   N: number;
@@ -35,7 +36,7 @@ export async function hashPassword(password: string): Promise<string> {
     N: COST,
     r: BLOCK_SIZE,
     p: PARALLELIZATION,
-    maxmem: 128 * COST * BLOCK_SIZE + 1024,
+    maxmem: SCRYPT_MAXMEM,
   });
 
   return [
@@ -78,7 +79,7 @@ export async function verifyPassword(password: string, encoded: string): Promise
     N: params.N,
     r: params.r,
     p: params.p,
-    maxmem: 128 * params.N * params.r + 1024,
+    maxmem: Math.max(SCRYPT_MAXMEM, 128 * params.N * params.r + 1024),
   });
 
   return timingSafeEqual(expected, derivedKey);
