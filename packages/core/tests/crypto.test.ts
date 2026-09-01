@@ -14,7 +14,7 @@ import {
 describe("passwords", () => {
   it("hashes and verifies a password", async () => {
     const hash = await hashPassword("correct horse battery staple");
-    expect(hash).toMatch(/^scrypt-v1\\$/);
+    expect(hash).toMatch(/^scrypt-v1\$/);
     expect(await verifyPassword("correct horse battery staple", hash)).toBe(true);
     expect(await verifyPassword("wrong password", hash)).toBe(false);
   });
@@ -27,7 +27,7 @@ describe("passwords", () => {
 describe("OTP", () => {
   it("generates a six digit OTP", () => {
     const otp = generateOtp();
-    expect(otp).toMatch(/^\\d{6}$/);
+    expect(otp).toMatch(/^\d{6}$/);
   });
 
   it("verifies an OTP against its hash", () => {
@@ -47,7 +47,8 @@ describe("opaque tokens", () => {
 });
 
 describe("TOTP", () => {
-  const secret = "JBSWY3DPEHPK3PXP";
+  // RFC 6238 test secret: ASCII "12345678901234567890", base32 encoded.
+  const secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
   const timestamp = 59_000;
 
   it("generates the RFC 6238 SHA-1 test vector", () => {
@@ -69,7 +70,7 @@ describe("TOTP", () => {
   it("builds an otpauth URI", () => {
     const uri = buildTotpOtpAuthUri(secret, "user@example.com", "Nabimo Auth");
     expect(uri).toContain("otpauth://totp/");
-    expect(uri).toContain("secret=JBSWY3DPEHPK3PXP");
+    expect(uri).toContain("secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ");
     expect(uri).toContain("issuer=Nabimo+Auth");
   });
 });
