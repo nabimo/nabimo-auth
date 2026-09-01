@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../packages/database/generated"
+}
+
+model User {
+  id             String   @id @default(uuid())
+  email          String?  @unique
+  phone          String?  @unique
+  emailVerified  Boolean  @default(false)
+  phoneVerified  Boolean  @default(false)
+  passwordHash   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  sessions       Session[]
+  identities     Identity[]
+  verifications  Verification[]
+  refreshTokens  RefreshToken[]
+  twoFactor      TwoFactor?
+  recoveryCodes  RecoveryCode[]
+
+  @@index([createdAt])
+}
+
+model Identity {
+  id                String   @id @default(uuid())
+  userId            String
+  provider          String
+  providerAccountId  String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  userId      String
+  tokenHash   String   @unique
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  userAgent   String?
+  ipAddress   String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id          String   @id @default(uuid())
+  userId      String
+  tokenHash   String   @unique
+  familyId    String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  usedAt      DateTime?
+  revokedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([expiresAt])
+}
+
+model Verification {
+  id          String    @id @default(uuid())
+  userId      String?
+  type        VerificationType
+  target      String
+  codeHash    String?
+  tokenHash   String?
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  attempts    Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([target, type])
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+model TwoFactor {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  secretCipher String
+  enabledAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RecoveryCode {
+  id         String    @id @default(uuid())
+  userId     String
+  codeHash   String
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+enum VerificationType {
+  EMAIL_OTP
+  PHONE_OTP
+  EMAIL_VERIFICATION
+  PHONE_VERIFICATION
+  PASSWORD_RESET
+}
