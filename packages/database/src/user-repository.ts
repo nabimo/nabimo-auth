@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../generated/client";
+import type { PrismaClient } from "./generated/client.js";
 
 export interface CreateUserInput {
   email?: string;
