@@ -15,10 +15,13 @@
   },
   "dependencies": {
     "@nabimo-auth/core": "workspace:*",
-    "@prisma/client": "^7.10.0"
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "@types/pg": "^8.15.5",
     "prisma": "^7.10.0",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
