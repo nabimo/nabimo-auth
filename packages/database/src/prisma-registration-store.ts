@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../generated/client.js";
+import type { PrismaClient } from "./generated/client.js";
 import type { RegistrationTransactionStore } from "@nabimo-auth/core";
 
 export class PrismaRegistrationTransactionStore implements RegistrationTransactionStore {
