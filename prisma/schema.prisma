@@ -109,7 +109,7 @@ enum VerificationType {
 }
 
 model TwoFactor {
-  id           String   @id @unique
+  id           String   @id @default(uuid())
   userId       String   @unique
   secretCipher String
   enabledAt    DateTime?
