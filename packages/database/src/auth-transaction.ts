@@ -20,7 +20,9 @@ export async function createUserWithSession(
     const user = await tx.user.create({
       data: {
         email: input.email,
-        passwordHash: input.passwordHash,
+        passwordCredential: {
+          create: { passwordHash: input.passwordHash },
+        },
       },
     });
 
