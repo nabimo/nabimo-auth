@@ -82,7 +82,7 @@ model RefreshToken {
 }
 
 model Verification {
-  id          String           @id
+  id          String           @id @default(uuid())
   userId      String?
   type        VerificationType
   target      String
@@ -109,7 +109,7 @@ enum VerificationType {
 }
 
 model TwoFactor {
-  id           String   @id @default(uuid())
+  id           String   @id @unique
   userId       String   @unique
   secretCipher String
   enabledAt    DateTime?
