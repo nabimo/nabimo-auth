@@ -6,8 +6,8 @@ on:
   pull_request:
 
 jobs:
-  prisma:
-    name: Prisma / Node ${{ matrix.node-version }}
+  quality:
+    name: Quality / Node ${{ matrix.node-version }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -40,3 +40,12 @@ jobs:
 
       - name: Generate Prisma Client
         run: pnpm --filter @nabimo-auth/database exec prisma generate --config ../../prisma.config.ts
+
+      - name: Typecheck
+        run: pnpm -r typecheck
+
+      - name: Test
+        run: pnpm -r test
+
+      - name: Build
+        run: pnpm -r build
