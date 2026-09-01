@@ -13,6 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@nabimo-auth/core": "workspace:*",
+    "@nabimo-auth/database": "workspace:*",
     "h3": "^1.15.11"
   },
   "devDependencies": {
