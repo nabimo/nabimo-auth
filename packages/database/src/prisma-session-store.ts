@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../generated/client.js";
+import type { PrismaClient } from "./generated/client.js";
 import type { SessionStore } from "@nabimo-auth/core";
 
 export class PrismaSessionStore implements SessionStore {
