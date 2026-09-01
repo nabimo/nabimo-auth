@@ -41,6 +41,7 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @nabimo-auth/database exec prisma generate --config ../../prisma.config.ts
 
+      # CI pipeline: typecheck, tests, and build run after the generated client.
       - name: Typecheck
         run: pnpm -r typecheck
 
