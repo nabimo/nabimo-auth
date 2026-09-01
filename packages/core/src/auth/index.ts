@@ -2,3 +2,6 @@ export * from "./errors.js";
 export * from "./types.js";
 export * from "./password.js";
 export * from "./credentials.js";
+export * from "./registration.js";
+export * from "./service-contracts.js";
+export * from "./service.js";
