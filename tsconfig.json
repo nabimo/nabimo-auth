@@ -7,7 +7,14 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@nabimo-auth/core": ["packages/core/src/index.ts"],
+      "@nabimo-auth/core/*": ["packages/core/src/*"],
+      "@nabimo-auth/database": ["packages/database/src/index.ts"],
+      "@nabimo-auth/database/*": ["packages/database/src/*"]
+    }
   },
   "files": [],
   "references": [
