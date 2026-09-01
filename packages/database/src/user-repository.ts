@@ -10,15 +10,24 @@ export class UserRepository {
   constructor(private readonly db: PrismaClient) {}
 
   findById(id: string) {
-    return this.db.user.findUnique({ where: { id } });
+    return this.db.user.findUnique({
+      where: { id },
+      include: { passwordCredential: true },
+    });
   }
 
   findByEmail(email: string) {
-    return this.db.user.findUnique({ where: { email } });
+    return this.db.user.findUnique({
+      where: { email },
+      include: { passwordCredential: true },
+    });
   }
 
   findByPhone(phone: string) {
-    return this.db.user.findUnique({ where: { phone } });
+    return this.db.user.findUnique({
+      where: { phone },
+      include: { passwordCredential: true },
+    });
   }
 
   create(input: CreateUserInput) {
@@ -26,6 +35,15 @@ export class UserRepository {
       throw new Error("User requires an email or phone");
     }
 
-    return this.db.user.create({ data: input });
+    const { passwordHash, ...userData } = input;
+    return this.db.user.create({
+      data: {
+        ...userData,
+        ...(passwordHash
+          ? { passwordCredential: { create: { passwordHash } } }
+          : {}),
+      },
+      include: { passwordCredential: true },
+    });
   }
 }
