@@ -6,20 +6,25 @@ import { createRefreshToken, hashRefreshToken } from "./refresh-token.js";
 import { DEFAULT_SESSION_POLICY } from "./service.js";
 
 export interface RefreshTokenStore {
-  rotateRefreshToken(input: {
-    tokenHash: string;
-    now: Date;
-    newTokenHash: string;
-    newTokenFamilyId: string;
-    newTokenExpiresAt: Date;
-    replacedBy: string;
-  }): Promise<{
+  getRefreshToken(tokenHash: string): Promise<{
     userId: string;
     email: string | null;
     sessionId: string;
     familyId: string;
     sessionExpiresAt: Date;
+    expiresAt: Date;
+    usedAt: Date | null;
+    revokedAt: Date | null;
   } | null>;
+
+  rotateRefreshToken(input: {
+    tokenHash: string;
+    now: Date;
+    familyId: string;
+    newTokenHash: string;
+    newTokenExpiresAt: Date;
+    replacedBy: string;
+  }): Promise<boolean>;
 }
 
 export interface RefreshServiceConfig {
@@ -39,23 +44,30 @@ export class RefreshService {
     }
 
     const tokenHash = hashRefreshToken(refreshToken);
-    const tokenId = randomUUID();
-    const familyId = randomUUID();
-    const replacement = createRefreshToken(familyId);
-    const result = await this.config.refreshTokens.rotateRefreshToken({
+    const stored = await this.config.refreshTokens.getRefreshToken(tokenHash);
+    if (!stored) throw authErrors.invalidCredentials();
+
+    // A used/revoked/expired token is never accepted. The database store must
+    // revoke the entire family when a previously-used token is presented.
+    if (stored.usedAt || stored.revokedAt || stored.expiresAt <= now || stored.sessionExpiresAt <= now) {
+      throw authErrors.invalidCredentials();
+    }
+
+    const replacement = createRefreshToken(stored.familyId);
+    const rotated = await this.config.refreshTokens.rotateRefreshToken({
       tokenHash,
       now,
+      familyId: stored.familyId,
       newTokenHash: replacement.tokenHash,
-      newTokenFamilyId: replacement.familyId,
-      newTokenExpiresAt: new Date(now.getTime() + DEFAULT_SESSION_POLICY.refreshTokenTtlSeconds * 1000),
-      replacedBy: tokenId,
+      newTokenExpiresAt: stored.sessionExpiresAt,
+      replacedBy: randomUUID(),
     });
 
-    if (!result) throw authErrors.invalidCredentials();
+    if (!rotated) throw authErrors.invalidCredentials();
 
     const claims = createAccessTokenClaims(
-      result.userId,
-      result.sessionId,
+      stored.userId,
+      stored.sessionId,
       randomUUID(),
       Math.floor(now.getTime() / 1000),
       {
@@ -66,8 +78,8 @@ export class RefreshService {
     );
 
     return {
-      user: { id: result.userId, email: result.email },
-      sessionId: result.sessionId,
+      user: { id: stored.userId, email: stored.email },
+      sessionId: stored.sessionId,
       accessToken: signAccessToken(claims, this.config.jwtPrivateKeyPem, this.config.jwtKeyId),
       refreshToken: replacement.token,
     };
