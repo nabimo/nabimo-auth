@@ -1,4 +1,4 @@
-import { createRouter, eventHandler, getHeader, readBody } from "h3";
+import { createRouter, eventHandler, getHeader, readBody, type H3Event } from "h3";
 import {
   AccessTokenValidationService,
   AuthService,
@@ -61,7 +61,7 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
   return router;
 }
 
-function getBearerToken(event: Parameters<typeof eventHandler>[0] extends never ? never : any): string | null {
+function getBearerToken(event: H3Event): string | null {
   const authorization = getHeader(event, "authorization");
   if (!authorization) return null;
 
