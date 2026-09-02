@@ -13,6 +13,7 @@ describe("RefreshService", () => {
       sessionId: "session-1",
       familyId: "family-1",
       sessionExpiresAt: new Date("2030-01-01T00:00:00.000Z"),
+      sessionRevokedAt: null as Date | null,
       expiresAt: new Date("2030-01-01T00:00:00.000Z"),
       usedAt: null as Date | null,
       revokedAt: null as Date | null,
@@ -62,6 +63,7 @@ describe("RefreshService", () => {
           sessionId: "session-1",
           familyId: "family-1",
           sessionExpiresAt: new Date("2030-01-01T00:00:00.000Z"),
+          sessionRevokedAt: null,
           expiresAt: new Date("2030-01-01T00:00:00.000Z"),
           usedAt: new Date("2026-09-01T00:00:00.000Z"),
           revokedAt: null,
@@ -94,6 +96,7 @@ describe("RefreshService", () => {
           sessionId: "session-1",
           familyId: "family-1",
           sessionExpiresAt: new Date("2026-09-01T00:00:00.000Z"),
+          sessionRevokedAt: null,
           expiresAt: new Date("2026-09-01T00:00:00.000Z"),
           usedAt: null,
           revokedAt: null,
@@ -113,5 +116,39 @@ describe("RefreshService", () => {
     await expect(
       service.refresh(token.token, new Date("2026-09-02T00:00:00.000Z")),
     ).rejects.toThrow("Invalid credentials");
+  });
+
+  it("rejects a refresh token from a revoked session", async () => {
+    const keys = generateJwtKeyPair();
+    const token = createRefreshToken("family-1");
+    let rotateCalled = false;
+    const store: RefreshTokenStore = {
+      async getRefreshToken() {
+        return {
+          userId: "user-1",
+          email: null,
+          sessionId: "session-1",
+          familyId: "family-1",
+          sessionExpiresAt: new Date("2030-01-01T00:00:00.000Z"),
+          sessionRevokedAt: new Date("2026-09-02T00:00:00.000Z"),
+          expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+          usedAt: null,
+          revokedAt: null,
+        };
+      },
+      async rotateRefreshToken() {
+        rotateCalled = true;
+        return true;
+      },
+    };
+
+    const service = new RefreshService({
+      refreshTokens: store,
+      jwtPrivateKeyPem: keys.privateKeyPem,
+      jwtKeyId: "test-key",
+    });
+
+    await expect(service.refresh(token.token)).rejects.toThrow("Invalid credentials");
+    expect(rotateCalled).toBe(false);
   });
 });
