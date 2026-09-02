@@ -60,7 +60,17 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
         where: { id: token.id, usedAt: null, revokedAt: null },
         data: { usedAt: input.now, replacedBy: input.newTokenId },
       });
-      if (claimed.count !== 1) return false;
+      if (claimed.count !== 1) {
+        await tx.refreshToken.updateMany({
+          where: { familyId: token.familyId, revokedAt: null },
+          data: { revokedAt: input.now },
+        });
+        await tx.session.updateMany({
+          where: { id: token.sessionId, revokedAt: null },
+          data: { revokedAt: input.now },
+        });
+        return false;
+      }
 
       await tx.refreshToken.create({
         data: {
