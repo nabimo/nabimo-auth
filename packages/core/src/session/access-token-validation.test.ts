@@ -4,7 +4,7 @@ import { createAccessTokenClaims } from "../auth/token-policy.js";
 import { AccessTokenValidationService, type AccessTokenSessionStore } from "./access-token-validation.js";
 
 describe("AccessTokenValidationService", () => {
-  const now = new Date("2026-09-02T00:00:00.000Z");
+  const now = new Date("2026-09-02T05:00:00.000Z");
 
   function createSession(overrides: Record<string, unknown> = {}) {
     return {
