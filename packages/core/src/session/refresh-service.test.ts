@@ -36,7 +36,7 @@ describe("RefreshService", () => {
       jwtKeyId: "test-key",
     });
 
-    const result = await service.refresh(original.token, new Date("2026-09-02T00:00:00.000Z"));
+    const result = await service.refresh(original.token, new Date("2030-09-02T00:00:00.000Z"));
 
     expect(rotationInput?.familyId).toBe("family-1");
     expect(rotationInput?.tokenHash).toBe(original.tokenHash);
