@@ -9,7 +9,7 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
       where: { tokenHash },
       include: {
         user: { select: { email: true } },
-        session: { select: { expiresAt: true } },
+        session: { select: { expiresAt: true, revokedAt: true } },
       },
     });
 
@@ -21,6 +21,7 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
       sessionId: token.sessionId,
       familyId: token.familyId,
       sessionExpiresAt: token.session.expiresAt,
+      sessionRevokedAt: token.session.revokedAt,
       expiresAt: token.expiresAt,
       usedAt: token.usedAt,
       revokedAt: token.revokedAt,
@@ -29,19 +30,20 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
 
   async rotateRefreshToken(input: Parameters<RefreshTokenStore["rotateRefreshToken"]>[0]): Promise<boolean> {
     return this.db.$transaction(async (tx) => {
-      const token = await tx.refreshToken.findUnique({ where: { tokenHash: input.tokenHash } });
+      const token = await tx.refreshToken.findUnique({
+        where: { tokenHash: input.tokenHash },
+        include: { session: { select: { expiresAt: true, revokedAt: true } } },
+      });
       if (!token) return false;
 
-      if (token.usedAt || token.revokedAt || token.expiresAt <= input.now) {
-        // Presenting an old token is a reuse signal. Revoke the whole family
-        // and the associated session so an attacker cannot keep refreshing it.
+      if (token.usedAt || token.revokedAt || token.expiresAt <= input.now || token.session.revokedAt || token.session.expiresAt <= input.now) {
         if (token.usedAt) {
           await tx.refreshToken.updateMany({
             where: { familyId: token.familyId, revokedAt: null },
             data: { revokedAt: input.now },
           });
-          await tx.session.update({
-            where: { id: token.sessionId },
+          await tx.session.updateMany({
+            where: { id: token.sessionId, revokedAt: null },
             data: { revokedAt: input.now },
           });
         }
@@ -49,17 +51,9 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
       }
 
       const claimed = await tx.refreshToken.updateMany({
-        where: {
-          id: token.id,
-          usedAt: null,
-          revokedAt: null,
-        },
-        data: {
-          usedAt: input.now,
-          replacedBy: input.replacedBy,
-        },
+        where: { id: token.id, usedAt: null, revokedAt: null },
+        data: { usedAt: input.now, replacedBy: input.replacedBy },
       });
-
       if (claimed.count !== 1) return false;
 
       await tx.refreshToken.create({
