@@ -44,13 +44,15 @@ export class PrismaSessionManagementStore implements SessionManagementStore {
       });
       if (sessions.length === 0) return 0;
 
+      const sessionIds = sessions.map(({ id }) => id);
+
       await tx.session.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: now },
       });
 
       await tx.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
+        where: { sessionId: { in: sessionIds }, revokedAt: null },
         data: { revokedAt: now },
       });
 
