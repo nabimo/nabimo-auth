@@ -22,9 +22,9 @@ export interface RefreshTokenStore {
     tokenHash: string;
     now: Date;
     familyId: string;
+    newTokenId: string;
     newTokenHash: string;
     newTokenExpiresAt: Date;
-    replacedBy: string;
   }): Promise<boolean>;
 }
 
@@ -59,13 +59,14 @@ export class RefreshService {
     }
 
     const replacement = createRefreshToken(stored.familyId);
+    const replacementId = randomUUID();
     const rotated = await this.config.refreshTokens.rotateRefreshToken({
       tokenHash,
       now,
       familyId: stored.familyId,
+      newTokenId: replacementId,
       newTokenHash: replacement.tokenHash,
       newTokenExpiresAt: stored.sessionExpiresAt,
-      replacedBy: randomUUID(),
     });
 
     if (!rotated) throw authErrors.invalidCredentials();
