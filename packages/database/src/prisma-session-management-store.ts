@@ -20,6 +20,13 @@ export class PrismaSessionManagementStore implements SessionManagementStore {
     };
   }
 
+  async touchSession(sessionId: string, now: Date): Promise<void> {
+    await this.db.session.updateMany({
+      where: { id: sessionId, revokedAt: null, expiresAt: { gt: now } },
+      data: { lastUsedAt: now },
+    });
+  }
+
   async revokeSession(sessionId: string, now: Date): Promise<boolean> {
     return this.db.$transaction(async (tx) => {
       const result = await tx.session.updateMany({
