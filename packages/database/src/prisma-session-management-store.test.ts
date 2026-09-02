@@ -1,24 +1,39 @@
 import { describe, expect, it } from "vitest";
 import { PrismaSessionManagementStore } from "./prisma-session-management-store.js";
 
+type MockSession = { id: string; userId: string; revokedAt: Date | null };
+
+type MockTx = {
+  session: {
+    findUnique(args: { where: { id: string } }): Promise<MockSession | null>;
+    findMany(args: { where: { userId: string; revokedAt: null }; select: { id: boolean } }): Promise<{ id: string }[]>;
+    updateMany(args: { where: { id?: string; userId?: string; revokedAt: null }; data: { revokedAt: Date } }): Promise<{ count: number }>;
+  };
+  refreshToken: {
+    updateMany(args: { where: { sessionId?: string; userId?: string; revokedAt: null }; data: { revokedAt: Date } }): Promise<{ count: number }>;
+  };
+};
+
 function createDbMock() {
   const calls: string[] = [];
-  const sessions = [
+  const sessions: MockSession[] = [
     { id: "session-1", userId: "user-1", revokedAt: null },
     { id: "session-2", userId: "user-1", revokedAt: null },
     { id: "session-3", userId: "user-2", revokedAt: null },
   ];
 
-  const tx = {
+  const tx: MockTx = {
     session: {
-      async findUnique({ where }: { where: { id: string } }) {
+      async findUnique({ where }) {
         return sessions.find((session) => session.id === where.id) ?? null;
       },
-      async findMany({ where }: { where: { userId: string; revokedAt: null }; select: { id: boolean } }) {
+      async findMany({ where }) {
         calls.push(`findMany:${where.userId}`);
-        return sessions.filter((session) => session.userId === where.userId && session.revokedAt === null).map(({ id }) => ({ id }));
+        return sessions
+          .filter((session) => session.userId === where.userId && session.revokedAt === null)
+          .map(({ id }) => ({ id }));
       },
-      async updateMany({ where, data }: { where: { id?: string; userId?: string; revokedAt: null }; data: { revokedAt: Date } }) {
+      async updateMany({ where, data }) {
         const matches = sessions.filter(
           (session) =>
             (where.id === undefined || session.id === where.id) &&
@@ -31,46 +46,44 @@ function createDbMock() {
       },
     },
     refreshToken: {
-      async updateMany({ where, data }: { where: { sessionId?: string; userId?: string; revokedAt: null }; data: { revokedAt: Date } }) {
-        calls.push(
-          `token-update:${where.sessionId ?? `user:${where.userId}`}`,
-        );
+      async updateMany({ where }) {
+        calls.push(`token-update:${where.sessionId ?? `user:${where.userId}`}`);
         return { count: 1 };
       },
     },
   };
 
-  return {
-    calls,
-    db: {
-      session: {
-        async findUnique({ where }: { where: { id: string } }) {
-          const session = sessions.find((item) => item.id === where.id);
-          if (!session) return null;
-          return {
-            ...session,
-            expiresAt: new Date("2030-01-01T00:00:00.000Z"),
-            createdAt: new Date("2026-01-01T00:00:00.000Z"),
-            lastUsedAt: null,
-            userAgent: "test-agent",
-            ipAddress: "127.0.0.1",
-          };
-        },
-      },
-      async $transaction<T>(callback: (tx: typeof tx) => Promise<T>) {
-        return callback(tx);
+  const db = {
+    session: {
+      async findUnique({ where }: { where: { id: string } }) {
+        const session = sessions.find((item) => item.id === where.id);
+        if (!session) return null;
+        return {
+          ...session,
+          expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+          createdAt: new Date("2026-01-01T00:00:00.000Z"),
+          lastUsedAt: null,
+          userAgent: "test-agent",
+          ipAddress: "127.0.0.1",
+        };
       },
     },
+    async $transaction<T>(callback: (tx: MockTx) => Promise<T>) {
+      return callback(tx);
+    },
   };
+
+  return { db, calls, sessions };
 }
 
 describe("PrismaSessionManagementStore", () => {
   it("revokes one session and its refresh tokens", async () => {
-    const { db, calls } = createDbMock();
+    const { db, calls, sessions } = createDbMock();
     const store = new PrismaSessionManagementStore(db as never);
     const now = new Date("2026-09-02T00:00:00.000Z");
 
     await expect(store.revokeSession("session-1", now)).resolves.toBe(true);
+    expect(sessions.find((session) => session.id === "session-1")?.revokedAt).toEqual(now);
     expect(calls).toEqual(["session-update:1", "token-update:session-1"]);
   });
 
@@ -88,16 +101,16 @@ describe("PrismaSessionManagementStore", () => {
   });
 
   it("revokes all active sessions for only the requested user", async () => {
-    const { db, calls } = createDbMock();
+    const { db, calls, sessions } = createDbMock();
     const store = new PrismaSessionManagementStore(db as never);
     const now = new Date("2026-09-02T00:00:00.000Z");
 
     await expect(store.revokeAllSessions("user-1", now)).resolves.toBe(2);
-    expect(sessionsSnapshot(db)).toEqual(undefined);
+    expect(sessions.filter((session) => session.revokedAt === now).map((session) => session.id)).toEqual([
+      "session-1",
+      "session-2",
+    ]);
+    expect(sessions.find((session) => session.id === "session-3")?.revokedAt).toBeNull();
     expect(calls).toEqual(["findMany:user-1", "session-update:2", "token-update:user:user-1"]);
   });
 });
-
-function sessionsSnapshot(_db: unknown) {
-  return undefined;
-}
