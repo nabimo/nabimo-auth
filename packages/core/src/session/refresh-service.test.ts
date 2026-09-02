@@ -12,9 +12,9 @@ describe("RefreshService", () => {
       email: "user@example.com",
       sessionId: "session-1",
       familyId: "family-1",
-      sessionExpiresAt: new Date("2030-01-01T00:00:00.000Z"),
+      sessionExpiresAt: new Date("2030-09-03T00:00:00.000Z"),
       sessionRevokedAt: null as Date | null,
-      expiresAt: new Date("2030-01-01T00:00:00.000Z"),
+      expiresAt: new Date("2030-09-03T00:00:00.000Z"),
       usedAt: null as Date | null,
       revokedAt: null as Date | null,
     };
@@ -41,6 +41,7 @@ describe("RefreshService", () => {
 
     expect(rotationInput?.familyId).toBe("family-1");
     expect(rotationInput?.tokenHash).toBe(original.tokenHash);
+    expect(rotationInput?.newTokenId).toEqual(expect.any(String));
     expect(result.user).toEqual({ id: "user-1", email: "user@example.com" });
     expect(result.sessionId).toBe("session-1");
     expect(result.refreshToken).not.toBe(original.token);
