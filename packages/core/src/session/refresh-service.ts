@@ -12,6 +12,7 @@ export interface RefreshTokenStore {
     sessionId: string;
     familyId: string;
     sessionExpiresAt: Date;
+    sessionRevokedAt: Date | null;
     expiresAt: Date;
     usedAt: Date | null;
     revokedAt: Date | null;
@@ -47,9 +48,13 @@ export class RefreshService {
     const stored = await this.config.refreshTokens.getRefreshToken(tokenHash);
     if (!stored) throw authErrors.invalidCredentials();
 
-    // A used/revoked/expired token is never accepted. The database store must
-    // revoke the entire family when a previously-used token is presented.
-    if (stored.usedAt || stored.revokedAt || stored.expiresAt <= now || stored.sessionExpiresAt <= now) {
+    if (
+      stored.usedAt ||
+      stored.revokedAt ||
+      stored.sessionRevokedAt ||
+      stored.expiresAt <= now ||
+      stored.sessionExpiresAt <= now
+    ) {
       throw authErrors.invalidCredentials();
     }
 
