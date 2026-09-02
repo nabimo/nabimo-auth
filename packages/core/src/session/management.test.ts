@@ -13,56 +13,67 @@ describe("SessionManagementService", () => {
     ipAddress: "127.0.0.1",
   };
 
-  it("returns an active session", async () => {
-    const store: SessionManagementStore = {
-      async getSession() { return activeSession; },
-      async revokeSession() { return true; },
-      async revokeAllSessions() { return 1; },
-    };
+  const baseStore = (): SessionManagementStore => ({
+    async getSession() { return activeSession; },
+    async touchSession() {},
+    async revokeSession() { return true; },
+    async revokeAllSessions() { return 1; },
+  });
 
-    const service = new SessionManagementService(store);
-    await expect(service.getSession("session-1")).resolves.toEqual(activeSession);
+  it("returns an active session", async () => {
+    await expect(new SessionManagementService(baseStore()).getSession("session-1")).resolves.toEqual(activeSession);
   });
 
   it("rejects revoked and expired sessions", async () => {
     const store: SessionManagementStore = {
+      ...baseStore(),
       async getSession() {
         return { ...activeSession, revokedAt: new Date("2026-09-02T00:00:00.000Z") };
       },
-      async revokeSession() { return true; },
-      async revokeAllSessions() { return 0; },
     };
-
-    const service = new SessionManagementService(store);
-    await expect(service.getSession("session-1")).rejects.toThrow("Invalid credentials");
-
+    await expect(new SessionManagementService(store).getSession("session-1")).rejects.toThrow("Invalid credentials");
     expect(isActive({ ...activeSession, revokedAt: null }, new Date("2030-01-01T00:00:00.000Z"))).toBe(false);
   });
 
-  it("revokes one session", async () => {
+  it("touches an active session", async () => {
+    let seen: Date | undefined;
+    const store: SessionManagementStore = {
+      ...baseStore(),
+      async touchSession(sessionId, now) {
+        expect(sessionId).toBe("session-1");
+        seen = now;
+      },
+    };
+    const now = new Date("2026-09-02T00:00:00.000Z");
+    await new SessionManagementService(store).touchSession("session-1", now);
+    expect(seen).toEqual(now);
+  });
+
+  it("does not touch a revoked session", async () => {
+    const store: SessionManagementStore = {
+      ...baseStore(),
+      async getSession() { return { ...activeSession, revokedAt: new Date() }; },
+    };
+    await expect(new SessionManagementService(store).touchSession("session-1")).rejects.toThrow("Invalid credentials");
+  });
+
+  it("supports logout of one session", async () => {
     let called = false;
     const store: SessionManagementStore = {
-      async getSession() { return activeSession; },
-      async revokeSession(sessionId, now) {
-        called = sessionId === "session-1" && now instanceof Date;
-        return true;
-      },
-      async revokeAllSessions() { return 0; },
+      ...baseStore(),
+      async revokeSession(sessionId) { called = sessionId === "session-1"; return true; },
     };
-
-    await new SessionManagementService(store).revokeSession("session-1");
+    await new SessionManagementService(store).logout("session-1");
     expect(called).toBe(true);
   });
 
-  it("revokes all sessions and returns the number affected", async () => {
+  it("supports logout of all sessions", async () => {
     let userIdSeen = "";
     const store: SessionManagementStore = {
-      async getSession() { return activeSession; },
-      async revokeSession() { return true; },
+      ...baseStore(),
       async revokeAllSessions(userId) { userIdSeen = userId; return 3; },
     };
-
-    await expect(new SessionManagementService(store).revokeAllSessions("user-1")).resolves.toBe(3);
+    await expect(new SessionManagementService(store).logoutAll("user-1")).resolves.toBe(3);
     expect(userIdSeen).toBe("user-1");
   });
 });
