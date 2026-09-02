@@ -13,6 +13,7 @@ export interface ManagedSessionRecord {
 
 export interface SessionManagementStore {
   getSession(sessionId: string): Promise<ManagedSessionRecord | null>;
+  touchSession(sessionId: string, now: Date): Promise<void>;
   revokeSession(sessionId: string, now: Date): Promise<boolean>;
   revokeAllSessions(userId: string, now: Date): Promise<number>;
 }
@@ -28,14 +29,28 @@ export class SessionManagementService {
     return session;
   }
 
+  async touchSession(sessionId: string, now = new Date()): Promise<void> {
+    const session = await this.store.getSession(sessionId);
+    if (!session || !isActive(session, now)) throw authErrors.invalidCredentials();
+    await this.store.touchSession(sessionId, now);
+  }
+
   async revokeSession(sessionId: string, now = new Date()): Promise<void> {
     const revoked = await this.store.revokeSession(sessionId, now);
     if (!revoked) throw authErrors.invalidCredentials();
   }
 
+  async logout(sessionId: string, now = new Date()): Promise<void> {
+    return this.revokeSession(sessionId, now);
+  }
+
   async revokeAllSessions(userId: string, now = new Date()): Promise<number> {
     if (typeof userId !== "string" || !userId) throw authErrors.invalidCredentials();
     return this.store.revokeAllSessions(userId, now);
+  }
+
+  async logoutAll(userId: string, now = new Date()): Promise<number> {
+    return this.revokeAllSessions(userId, now);
   }
 }
 
