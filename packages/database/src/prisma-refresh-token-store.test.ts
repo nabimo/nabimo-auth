@@ -1,29 +1,59 @@
 import { describe, expect, it } from "vitest";
 import { PrismaRefreshTokenStore } from "./prisma-refresh-token-store.js";
 
+interface MockTransaction {
+  refreshToken: {
+    findUnique(): Promise<MockToken>;
+    updateMany(args: {
+      where: { id?: string; familyId?: string; usedAt?: null; revokedAt?: null };
+      data: { usedAt?: Date; replacedBy?: string; revokedAt?: Date };
+    }): Promise<{ count: number }>;
+    create(): Promise<void>;
+  };
+  session: {
+    updateMany(): Promise<{ count: number }>;
+    update(): Promise<void>;
+  };
+}
+
+interface MockToken {
+  id: string;
+  userId: string;
+  sessionId: string;
+  tokenHash: string;
+  familyId: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+  revokedAt: Date | null;
+  session: {
+    expiresAt: Date;
+    revokedAt: Date | null;
+  };
+}
+
 function createDbMock() {
   const calls: string[] = [];
-  const token = {
+  const token: MockToken = {
     id: "token-1",
     userId: "user-1",
     sessionId: "session-1",
     tokenHash: "hash-1",
     familyId: "family-1",
     expiresAt: new Date("2030-01-01T00:00:00.000Z"),
-    usedAt: null as Date | null,
-    revokedAt: null as Date | null,
+    usedAt: null,
+    revokedAt: null,
     session: {
       expiresAt: new Date("2030-01-01T00:00:00.000Z"),
-      revokedAt: null as Date | null,
+      revokedAt: null,
     },
   };
 
-  const tx = {
+  const tx: MockTransaction = {
     refreshToken: {
       async findUnique() {
         return token;
       },
-      async updateMany(args: { where: { id?: string; familyId?: string; usedAt?: null; revokedAt?: null }; data: { usedAt?: Date; replacedBy?: string; revokedAt?: Date } }) {
+      async updateMany(args) {
         if (args.where.id === token.id) {
           calls.push("claim");
           return { count: 0 };
@@ -49,7 +79,7 @@ function createDbMock() {
   return {
     calls,
     db: {
-      async $transaction<T>(callback: (tx: typeof tx) => Promise<T>) {
+      async $transaction<T>(callback: (transaction: MockTransaction) => Promise<T>) {
         return callback(tx);
       },
     },
