@@ -52,7 +52,7 @@ function createDbMock() {
       async $transaction<T>(callback: (tx: typeof tx) => Promise<T>) {
         return callback(tx);
       },
-    };
+    },
   };
 }
 
