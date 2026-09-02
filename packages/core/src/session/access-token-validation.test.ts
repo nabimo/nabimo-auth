@@ -39,7 +39,7 @@ describe("AccessTokenValidationService", () => {
       {
         issuer: overrides.iss ?? "nabimo-auth",
         audience: overrides.aud ?? "nabimo-auth-client",
-        ttlSeconds: 900,
+        ttlSeconds: 7200,
       },
     );
     return signAccessToken(claims, privateKeyPem, "test-key");
