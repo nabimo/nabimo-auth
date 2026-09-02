@@ -36,7 +36,13 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
       });
       if (!token) return false;
 
-      if (token.usedAt || token.revokedAt || token.expiresAt <= input.now || token.session.revokedAt || token.session.expiresAt <= input.now) {
+      if (
+        token.usedAt ||
+        token.revokedAt ||
+        token.expiresAt <= input.now ||
+        token.session.revokedAt ||
+        token.session.expiresAt <= input.now
+      ) {
         if (token.usedAt) {
           await tx.refreshToken.updateMany({
             where: { familyId: token.familyId, revokedAt: null },
@@ -52,12 +58,13 @@ export class PrismaRefreshTokenStore implements RefreshTokenStore {
 
       const claimed = await tx.refreshToken.updateMany({
         where: { id: token.id, usedAt: null, revokedAt: null },
-        data: { usedAt: input.now, replacedBy: input.replacedBy },
+        data: { usedAt: input.now, replacedBy: input.newTokenId },
       });
       if (claimed.count !== 1) return false;
 
       await tx.refreshToken.create({
         data: {
+          id: input.newTokenId,
           userId: token.userId,
           sessionId: token.sessionId,
           tokenHash: input.newTokenHash,
