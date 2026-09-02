@@ -1,6 +1,6 @@
 import { authErrors } from "../auth/errors.js";
 
-export interface SessionRecord {
+export interface ManagedSessionRecord {
   id: string;
   userId: string;
   expiresAt: Date;
@@ -12,7 +12,7 @@ export interface SessionRecord {
 }
 
 export interface SessionManagementStore {
-  getSession(sessionId: string): Promise<SessionRecord | null>;
+  getSession(sessionId: string): Promise<ManagedSessionRecord | null>;
   revokeSession(sessionId: string, now: Date): Promise<boolean>;
   revokeAllSessions(userId: string, now: Date): Promise<number>;
 }
@@ -20,7 +20,7 @@ export interface SessionManagementStore {
 export class SessionManagementService {
   constructor(private readonly store: SessionManagementStore) {}
 
-  async getSession(sessionId: string): Promise<SessionRecord> {
+  async getSession(sessionId: string): Promise<ManagedSessionRecord> {
     const session = await this.store.getSession(sessionId);
     if (!session || !isActive(session, new Date())) {
       throw authErrors.invalidCredentials();
@@ -39,6 +39,9 @@ export class SessionManagementService {
   }
 }
 
-export function isActive(session: Pick<SessionRecord, "expiresAt" | "revokedAt">, now = new Date()): boolean {
+export function isActive(
+  session: Pick<ManagedSessionRecord, "expiresAt" | "revokedAt">,
+  now = new Date(),
+): boolean {
   return session.revokedAt === null && session.expiresAt > now;
 }
