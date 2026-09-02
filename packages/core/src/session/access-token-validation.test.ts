@@ -30,12 +30,12 @@ describe("AccessTokenValidationService", () => {
     return { keys, service: new AccessTokenValidationService({ publicKeyPem: keys.publicKeyPem, sessions: store }) };
   }
 
-  function createToken(privateKeyPem: string, overrides: Partial<{ sub: string; sid: string; iss: string; aud: string }> = {}) {
+  function createToken(privateKeyPem: string, issuedAt = now, overrides: Partial<{ sub: string; sid: string; iss: string; aud: string }> = {}) {
     const claims = createAccessTokenClaims(
       overrides.sub ?? "user-1",
       overrides.sid ?? "session-1",
       "token-1",
-      Math.floor(now.getTime() / 1000),
+      Math.floor(issuedAt.getTime() / 1000),
       {
         issuer: overrides.iss ?? "nabimo-auth",
         audience: overrides.aud ?? "nabimo-auth-client",
@@ -47,7 +47,7 @@ describe("AccessTokenValidationService", () => {
 
   it("accepts a valid token only when its session is active", async () => {
     const { keys, service } = createService();
-    const token = createToken(keys.privateKeyPem);
+    const token = createToken(keys.privateKeyPem, now);
 
     const result = await service.validate(token, now);
     expect(result.claims.sub).toBe("user-1");
@@ -57,22 +57,22 @@ describe("AccessTokenValidationService", () => {
 
   it("rejects a token after its session is revoked", async () => {
     const { keys, service } = createService(createSession({ revokedAt: new Date("2026-09-01T00:00:00.000Z") }));
-    const token = createToken(keys.privateKeyPem);
+    const token = createToken(keys.privateKeyPem, now);
 
     await expect(service.validate(token, now)).rejects.toThrow("Invalid credentials");
   });
 
   it("rejects a token when session ownership does not match the token subject", async () => {
     const { keys, service } = createService(createSession({ userId: "different-user" }));
-    const token = createToken(keys.privateKeyPem);
+    const token = createToken(keys.privateKeyPem, now);
 
     await expect(service.validate(token, now)).rejects.toThrow("Invalid credentials");
   });
 
   it("rejects a token with the wrong issuer or audience", async () => {
     const { keys, service } = createService();
-    const wrongIssuer = createToken(keys.privateKeyPem, { iss: "wrong-issuer" });
-    const wrongAudience = createToken(keys.privateKeyPem, { aud: "wrong-audience" });
+    const wrongIssuer = createToken(keys.privateKeyPem, now, { iss: "wrong-issuer" });
+    const wrongAudience = createToken(keys.privateKeyPem, now, { aud: "wrong-audience" });
 
     await expect(service.validate(wrongIssuer, now)).rejects.toThrow("Invalid credentials");
     await expect(service.validate(wrongAudience, now)).rejects.toThrow("Invalid credentials");
