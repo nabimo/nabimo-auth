@@ -82,12 +82,8 @@ function createDbMock(options: { claimCount?: number; usedAt?: Date | null } = {
 
   return {
     calls,
-    get claimData() {
-      return claimData;
-    },
-    get createdData() {
-      return createdData;
-    },
+    getClaimData: () => claimData,
+    getCreatedData: () => createdData,
     db: {
       async $transaction<T>(callback: (transaction: MockTransaction) => Promise<T>) {
         return callback(tx);
@@ -98,8 +94,8 @@ function createDbMock(options: { claimCount?: number; usedAt?: Date | null } = {
 
 describe("PrismaRefreshTokenStore", () => {
   it("rotates the token atomically and creates its replacement", async () => {
-    const { db, calls, claimData, createdData } = createDbMock({ claimCount: 1 });
-    const store = new PrismaRefreshTokenStore(db as never);
+    const mock = createDbMock({ claimCount: 1 });
+    const store = new PrismaRefreshTokenStore(mock.db as never);
     const now = new Date("2026-09-02T00:00:00.000Z");
 
     const rotated = await store.rotateRefreshToken({
@@ -112,20 +108,20 @@ describe("PrismaRefreshTokenStore", () => {
     });
 
     expect(rotated).toBe(true);
-    expect(claimData).toEqual({ usedAt: now, replacedBy: "token-2" });
-    expect(createdData).toMatchObject({
+    expect(mock.getClaimData()).toEqual({ usedAt: now, replacedBy: "token-2" });
+    expect(mock.getCreatedData()).toMatchObject({
       id: "token-2",
       userId: "user-1",
       sessionId: "session-1",
       tokenHash: "hash-2",
       familyId: "family-1",
     });
-    expect(calls).toEqual(["claim", "create", "update-session"]);
+    expect(mock.calls).toEqual(["claim", "create", "update-session"]);
   });
 
   it("revokes the refresh-token family when an atomic claim loses a race", async () => {
-    const { db, calls } = createDbMock();
-    const store = new PrismaRefreshTokenStore(db as never);
+    const mock = createDbMock();
+    const store = new PrismaRefreshTokenStore(mock.db as never);
 
     const rotated = await store.rotateRefreshToken({
       tokenHash: "hash-1",
@@ -137,13 +133,13 @@ describe("PrismaRefreshTokenStore", () => {
     });
 
     expect(rotated).toBe(false);
-    expect(calls).toEqual(["claim", "revoke-family", "revoke-session"]);
-    expect(calls).not.toContain("create");
+    expect(mock.calls).toEqual(["claim", "revoke-family", "revoke-session"]);
+    expect(mock.calls).not.toContain("create");
   });
 
   it("revokes the family when a previously-used token is presented again", async () => {
-    const { db, calls } = createDbMock({ usedAt: new Date("2026-09-01T00:00:00.000Z") });
-    const store = new PrismaRefreshTokenStore(db as never);
+    const mock = createDbMock({ usedAt: new Date("2026-09-01T00:00:00.000Z") });
+    const store = new PrismaRefreshTokenStore(mock.db as never);
 
     const rotated = await store.rotateRefreshToken({
       tokenHash: "hash-1",
@@ -155,6 +151,6 @@ describe("PrismaRefreshTokenStore", () => {
     });
 
     expect(rotated).toBe(false);
-    expect(calls).toEqual(["revoke-family", "revoke-session"]);
+    expect(mock.calls).toEqual(["revoke-family", "revoke-session"]);
   });
 });
