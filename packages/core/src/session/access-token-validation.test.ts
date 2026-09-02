@@ -4,7 +4,7 @@ import { createAccessTokenClaims } from "../auth/token-policy.js";
 import { AccessTokenValidationService, type AccessTokenSessionStore } from "./access-token-validation.js";
 
 describe("AccessTokenValidationService", () => {
-  const now = new Date("2026-09-02T05:00:00.000Z");
+  const now = new Date();
 
   function createSession(overrides: Record<string, unknown> = {}) {
     return {
@@ -56,7 +56,7 @@ describe("AccessTokenValidationService", () => {
   });
 
   it("rejects a token after its session is revoked", async () => {
-    const { keys, service } = createService(createSession({ revokedAt: new Date("2026-09-01T00:00:00.000Z") }));
+    const { keys, service } = createService(createSession({ revokedAt: new Date(now.getTime() - 1000) }));
     const token = createToken(keys.privateKeyPem, now);
 
     await expect(service.validate(token, now)).rejects.toThrow("Invalid credentials");
