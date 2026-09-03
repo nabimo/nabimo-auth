@@ -1,4 +1,4 @@
-import { randomInt } from "node:crypto";
+import { randomInt, randomUUID } from "node:crypto";
 import { authErrors } from "./errors.js";
 import { normalizeEmail } from "./credentials.js";
 import { sha256 } from "../crypto/hash.js";
@@ -17,14 +17,7 @@ export interface VerificationRecord {
 }
 
 export interface VerificationStore {
-  create(input: {
-    id: string;
-    userId: string | null;
-    type: OtpVerificationType;
-    target: string;
-    codeHash: string;
-    expiresAt: Date;
-  }): Promise<void>;
+  create(input: { id: string; userId: string | null; type: OtpVerificationType; target: string; codeHash: string; expiresAt: Date }): Promise<void>;
   findActive(id: string, now: Date): Promise<VerificationRecord | null>;
   incrementAttempts(id: string): Promise<void>;
   consume(id: string, now: Date): Promise<void>;
@@ -69,42 +62,25 @@ export class VerificationService {
   async verifyOtp(challengeId: string, code: string): Promise<void> {
     const now = new Date();
     const challenge = await this.config.store.findActive(challengeId, now);
-    if (!challenge || challenge.consumedAt || challenge.expiresAt <= now) {
-      throw authErrors.invalidOtp();
-    }
-    if (challenge.attempts >= this.maxAttempts) {
+    if (!challenge || challenge.consumedAt || challenge.expiresAt <= now || challenge.attempts >= this.maxAttempts) {
       throw authErrors.invalidOtp();
     }
 
-    const valid = sha256(code) === challenge.codeHash;
-    if (!valid) {
+    if (sha256(code) !== challenge.codeHash) {
       await this.config.store.incrementAttempts(challengeId);
       throw authErrors.invalidOtp();
     }
 
     await this.config.store.consume(challengeId, now);
-    if (challenge.userId) {
-      await this.config.store.markVerified(challenge.userId, challenge.type);
-    }
+    if (challenge.userId) await this.config.store.markVerified(challenge.userId, challenge.type);
   }
 
-  private async requestOtp(
-    userId: string | null,
-    type: OtpVerificationType,
-    target: string,
-  ): Promise<OtpChallenge> {
+  private async requestOtp(userId: string | null, type: OtpVerificationType, target: string): Promise<OtpChallenge> {
     const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
-    const challengeId = crypto.randomUUID();
+    const challengeId = randomUUID();
     const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
 
-    await this.config.store.create({
-      id: challengeId,
-      userId,
-      type,
-      target,
-      codeHash: sha256(code),
-      expiresAt,
-    });
+    await this.config.store.create({ id: challengeId, userId, type, target, codeHash: sha256(code), expiresAt });
     await this.config.sender.send({ type, target, code });
 
     return { challengeId, type, target, expiresAt };
