@@ -19,6 +19,17 @@ export interface LogoutAllResponse {
   revokedSessions: number;
 }
 
+export interface VerificationChallengeResponse {
+  challengeId: string;
+  type: "email_otp" | "phone_otp";
+  target: string;
+  expiresAt: string;
+}
+
+export interface VerificationSuccessResponse {
+  success: true;
+}
+
 export interface RegisterRequest {
   email: string;
   password: string;
@@ -31,6 +42,15 @@ export interface PasswordLoginRequest {
 
 export interface RefreshRequest {
   refreshToken: string;
+}
+
+export interface EmailVerificationRequest {
+  email: string;
+}
+
+export interface VerifyOtpRequest {
+  challengeId: string;
+  code: string;
 }
 
 export interface AuthErrorData {
@@ -50,4 +70,6 @@ export const AUTH_ENDPOINTS = {
   refresh: "POST /auth/refresh",
   logout: "POST /auth/logout",
   logoutAll: "POST /auth/logout-all",
+  requestEmailVerification: "POST /auth/verify/email/request",
+  verifyOtp: "POST /auth/verify/otp",
 } as const;
