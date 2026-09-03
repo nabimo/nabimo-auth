@@ -1,0 +1,49 @@
+export interface AuthUserResponse {
+  id: string;
+  email: string;
+}
+
+export interface AuthenticationResponse {
+  user: AuthUserResponse;
+  sessionId: string;
+  accessToken: string;
+  refreshToken: string;
+}
+
+export interface LogoutResponse {
+  success: true;
+}
+
+export interface LogoutAllResponse {
+  success: true;
+  revokedSessions: number;
+}
+
+export interface AuthErrorResponse {
+  statusCode: number;
+  data: {
+    code: string;
+  };
+}
+
+export interface RegisterRequest {
+  email: string;
+  password: string;
+}
+
+export interface PasswordLoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RefreshRequest {
+  refreshToken: string;
+}
+
+export const AUTH_ENDPOINTS = {
+  register: "POST /auth/register",
+  passwordLogin: "POST /auth/login/password",
+  refresh: "POST /auth/refresh",
+  logout: "POST /auth/logout",
+  logoutAll: "POST /auth/logout-all",
+} as const;
