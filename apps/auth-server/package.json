@@ -1,5 +1,5 @@
 {
-  "name": "@nabimo-auth/server",
+  "name": "@nabimo-auth/auth-server",
   "version": "0.1.0",
   "private": true,
   "description": "Self-hosted authentication server for Nabimo Auth.",
@@ -15,6 +15,7 @@
   "dependencies": {
     "@nabimo-auth/core": "workspace:*",
     "@nabimo-auth/database": "workspace:*",
+    "@nabimo-auth/server": "workspace:*",
     "h3": "^1.15.11"
   },
   "devDependencies": {
