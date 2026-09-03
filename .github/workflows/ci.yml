@@ -41,13 +41,20 @@ jobs:
       - name: Generate Prisma Client
         run: pnpm --filter @nabimo-auth/database exec prisma generate --config ../../prisma.config.ts
 
-      # Protocol is a workspace dependency of the framework-agnostic client.
-      # Build it first so TypeScript resolves its published declaration surface
-      # instead of pulling protocol/src into the client's rootDir.
-      - name: Build protocol declarations
+      # Build workspace package declarations before consumers typecheck so
+      # package boundaries resolve to published surfaces rather than source.
+      - name: Build protocol
         run: pnpm --filter @nabimo-auth/protocol build
 
-      # CI pipeline: typecheck, tests, and build run after the generated client.
+      - name: Build core
+        run: pnpm --filter @nabimo-auth/core build
+
+      - name: Build database
+        run: pnpm --filter @nabimo-auth/database build
+
+      - name: Build server
+        run: pnpm --filter @nabimo-auth/server build
+
       - name: Typecheck
         run: pnpm -r typecheck
 
