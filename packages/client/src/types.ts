@@ -1,27 +1,20 @@
-export interface AuthUser {
-  id: string;
-  email: string;
-}
+import type {
+  AuthErrorResponse,
+  AuthUserResponse,
+  AuthenticationResponse,
+  LogoutAllResponse,
+  LogoutResponse,
+} from "@nabimo-auth/protocol";
+
+export type AuthUser = AuthUserResponse;
+export type AuthenticationResult = AuthenticationResponse;
+export type LogoutResult = LogoutResponse;
+export type LogoutAllResult = LogoutAllResponse;
+export type { AuthErrorResponse };
 
 export interface AuthTokens {
   accessToken: string;
   refreshToken: string;
-}
-
-export interface AuthenticationResult {
-  user: AuthUser;
-  sessionId: string;
-  accessToken: string;
-  refreshToken: string;
-}
-
-export interface LogoutResult {
-  success: true;
-}
-
-export interface LogoutAllResult {
-  success: true;
-  revokedSessions: number;
 }
 
 export interface TokenStorage {
@@ -41,10 +34,6 @@ export interface AuthRequestOptions extends Omit<RequestInit, "body" | "headers"
   body?: unknown;
   headers?: HeadersInit;
   auth?: boolean;
-}
-
-export interface AuthErrorPayload {
-  code?: string;
 }
 
 export class AuthClientError extends Error {
