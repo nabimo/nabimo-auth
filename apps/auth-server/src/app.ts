@@ -1,7 +1,7 @@
 import { createApp, eventHandler, toNodeListener } from "h3";
 import { createServer } from "node:http";
 import { createPublicKey } from "node:crypto";
-import { AuthService, AccessTokenValidationService, RefreshService, SessionManagementService } from "@nabimo-auth/core";
+import { AuthService, AccessTokenValidationService, RefreshService, SessionManagementService, VerificationService } from "@nabimo-auth/core";
 import {
   getDatabaseClient,
   UserRepository,
@@ -9,9 +9,11 @@ import {
   PrismaRegistrationTransactionStore,
   PrismaSessionManagementStore,
   PrismaRefreshTokenStore,
+  PrismaVerificationStore,
 } from "@nabimo-auth/database";
 import { createAuthRouter } from "@nabimo-auth/server";
 import { loadConfig } from "./config.js";
+import { ConsoleVerificationCodeSender } from "./verification-sender.js";
 
 export function createAuthApp() {
   const config = loadConfig();
@@ -21,6 +23,11 @@ export function createAuthApp() {
   const registration = new PrismaRegistrationTransactionStore(db);
   const sessionManagementStore = new PrismaSessionManagementStore(db);
   const refreshTokenStore = new PrismaRefreshTokenStore(db);
+  const verificationStore = new PrismaVerificationStore(db);
+  const verification = new VerificationService({
+    store: verificationStore,
+    sender: new ConsoleVerificationCodeSender(),
+  });
   const publicKeyPem = createPublicKey(config.jwtPrivateKeyPem).export({ type: "spki", format: "pem" }).toString();
 
   const auth = new AuthService({
@@ -50,7 +57,7 @@ export function createAuthApp() {
 
   const app = createApp();
   app.use("/health", eventHandler(() => ({ status: "ok" })));
-  app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement }).handler);
+  app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, users }).handler);
 
   return { app, db };
 }
