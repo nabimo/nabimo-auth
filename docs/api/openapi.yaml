@@ -94,6 +94,52 @@ paths:
                 $ref: '#/components/schemas/LogoutAllResponse'
         '401':
           $ref: '#/components/responses/InvalidCredentials'
+  /auth/verify/email/request:
+    post:
+      operationId: requestEmailVerification
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailVerificationRequest'
+      responses:
+        '200':
+          description: Email verification OTP was created and dispatched.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationChallengeResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/InvalidCredentials'
+  /auth/verify/otp:
+    post:
+      operationId: verifyOtp
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '200':
+          description: OTP verified successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          description: OTP is invalid, expired, or exhausted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   securitySchemes:
     bearerAuth:
@@ -118,6 +164,38 @@ components:
         refreshToken:
           type: string
           minLength: 1
+    EmailVerificationRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    VerifyOtpRequest:
+      type: object
+      required: [challengeId, code]
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        code:
+          type: string
+          pattern: '^\\d{6}$'
+    VerificationChallengeResponse:
+      type: object
+      required: [challengeId, type, target, expiresAt]
+      properties:
+        challengeId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [email_otp, phone_otp]
+        target:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
     User:
       type: object
       required: [id, email]
