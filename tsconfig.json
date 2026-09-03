@@ -10,11 +10,11 @@
     "types": ["node"],
     "baseUrl": ".",
     "paths": {
-      "@nabimo-auth/core": ["packages/core/src/index.ts"],
-      "@nabimo-auth/core/*": ["packages/core/src/*"],
-      "@nabimo-auth/database": ["packages/database/src/index.ts"],
-      "@nabimo-auth/database/*": ["packages/database/src/*"],
-      "@nabimo-auth/protocol": ["packages/protocol/src/index.ts"]
+      "@nabimo-auth/core": ["packages/core/dist/index.d.ts"],
+      "@nabimo-auth/core/*": ["packages/core/dist/*"],
+      "@nabimo-auth/database": ["packages/database/dist/index.d.ts"],
+      "@nabimo-auth/database/*": ["packages/database/dist/*"],
+      "@nabimo-auth/protocol": ["packages/protocol/dist/index.d.ts"]
     }
   },
   "files": [],
