@@ -1,6 +1,6 @@
 export interface AuthUserResponse {
   id: string;
-  email: string;
+  email?: string | null;
 }
 
 export interface AuthenticationResponse {
