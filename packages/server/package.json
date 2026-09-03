@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@nabimo-auth/core": "workspace:*",
+    "@nabimo-auth/protocol": "workspace:*",
     "h3": "^1.15.11"
   },
   "devDependencies": {
