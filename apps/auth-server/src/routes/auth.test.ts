@@ -1,4 +1,4 @@
-import { createApp } from "h3";
+import { createApp, toWebHandler } from "h3";
 import { describe, expect, it, vi } from "vitest";
 import { AuthError } from "@nabimo-auth/core";
 import { createAuthRouter } from "./auth.js";
@@ -24,14 +24,18 @@ function createTestApp(overrides: Record<string, unknown> = {}) {
 
   const app = createApp();
   app.use("/auth", createAuthRouter(dependencies as never).handler);
-  return { app, dependencies };
+  return { app: toWebHandler(app), dependencies };
+}
+
+async function request(handler: ReturnType<typeof toWebHandler>, path: string, init?: RequestInit) {
+  return handler(new Request(`http://localhost${path}`, init));
 }
 
 describe("auth HTTP contract", () => {
   it("returns 400 for malformed registration requests", async () => {
     const { app } = createTestApp();
 
-    const response = await app.request("/auth/register", {
+    const response = await request(app, "/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: "user@example.com" }),
@@ -50,7 +54,7 @@ describe("auth HTTP contract", () => {
     };
     const { app } = createTestApp({ auth });
 
-    const response = await app.request("/auth/register", {
+    const response = await request(app, "/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: "user@example.com", password: "password" }),
@@ -64,7 +68,7 @@ describe("auth HTTP contract", () => {
   it("returns 401 for logout without a bearer token", async () => {
     const { app } = createTestApp();
 
-    const response = await app.request("/auth/logout", { method: "POST" });
+    const response = await request(app, "/auth/logout", { method: "POST" });
 
     expect(response.status).toBe(401);
     const body = await response.json();
