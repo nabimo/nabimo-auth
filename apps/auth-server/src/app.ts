@@ -10,7 +10,7 @@ import {
   PrismaSessionManagementStore,
   PrismaRefreshTokenStore,
 } from "@nabimo-auth/database";
-import { createAuthRouter } from "./routes/auth.js";
+import { createAuthRouter } from "@nabimo-auth/server";
 import { loadConfig } from "./config.js";
 
 export function createAuthApp() {
