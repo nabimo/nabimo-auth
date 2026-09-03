@@ -76,4 +76,31 @@ describe("auth server contract", () => {
     expect(response.status).toBe(401);
     expect((await response.json()).data?.code).toBe("INVALID_CREDENTIALS");
   });
+
+  it("requires bearer authentication for email verification requests", async () => {
+    const verification = { requestEmailOtp: vi.fn(), verifyOtp: vi.fn() };
+    const users = { findById: vi.fn() };
+    const { app } = createTestApp({ verification, users });
+    const response = await app.request("/auth/verify/email/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "user@example.com" }),
+    });
+    expect(response.status).toBe(401);
+    expect((await response.json()).data?.code).toBe("INVALID_CREDENTIALS");
+    expect(verification.requestEmailOtp).not.toHaveBeenCalled();
+  });
+
+  it("verifies a valid OTP through the verification service", async () => {
+    const verification = { requestEmailOtp: vi.fn(), verifyOtp: vi.fn().mockResolvedValue(undefined) };
+    const { app } = createTestApp({ verification });
+    const response = await app.request("/auth/verify/otp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ challengeId: "challenge-1", code: "123456" }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true });
+    expect(verification.verifyOtp).toHaveBeenCalledWith("challenge-1", "123456");
+  });
 });
