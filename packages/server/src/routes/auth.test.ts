@@ -1,4 +1,4 @@
-import { createApp } from "h3";
+import { createApp, toWebHandler } from "h3";
 import { describe, expect, it, vi } from "vitest";
 import { AuthError } from "@nabimo-auth/core";
 import { createAuthRouter } from "./auth.js";
@@ -19,7 +19,11 @@ function createTestApp(overrides: Record<string, unknown> = {}) {
   };
   const app = createApp();
   app.use("/auth", createAuthRouter(dependencies as never).handler);
-  return { app, dependencies };
+  return { app: toWebHandler(app), dependencies };
+}
+
+async function request(handler: ReturnType<typeof toWebHandler>, path: string, init?: RequestInit) {
+  return handler(new Request(`http://localhost${path}`, init));
 }
 
 describe("auth server contract", () => {
@@ -33,7 +37,7 @@ describe("auth server contract", () => {
     const { app } = createTestApp({
       auth: { registerWithPassword: vi.fn().mockResolvedValue(result), loginWithPassword: vi.fn() },
     });
-    const response = await app.request("/auth/register", {
+    const response = await request(app, "/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: "user@example.com", password: "password" }),
@@ -44,7 +48,7 @@ describe("auth server contract", () => {
 
   it("returns 400 for malformed requests", async () => {
     const { app } = createTestApp();
-    const response = await app.request("/auth/refresh", {
+    const response = await request(app, "/auth/refresh", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({}),
@@ -61,7 +65,7 @@ describe("auth server contract", () => {
         loginWithPassword: vi.fn(),
       },
     });
-    const response = await app.request("/auth/register", {
+    const response = await request(app, "/auth/register", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: "user@example.com", password: "password" }),
@@ -72,7 +76,7 @@ describe("auth server contract", () => {
 
   it("requires bearer authentication for logout", async () => {
     const { app } = createTestApp();
-    const response = await app.request("/auth/logout", { method: "POST" });
+    const response = await request(app, "/auth/logout", { method: "POST" });
     expect(response.status).toBe(401);
     expect((await response.json()).data?.code).toBe("INVALID_CREDENTIALS");
   });
@@ -81,7 +85,7 @@ describe("auth server contract", () => {
     const verification = { requestEmailOtp: vi.fn(), verifyOtp: vi.fn() };
     const users = { findById: vi.fn() };
     const { app } = createTestApp({ verification, users });
-    const response = await app.request("/auth/verify/email/request", {
+    const response = await request(app, "/auth/verify/email/request", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: "user@example.com" }),
@@ -94,7 +98,7 @@ describe("auth server contract", () => {
   it("verifies a valid OTP through the verification service", async () => {
     const verification = { requestEmailOtp: vi.fn(), verifyOtp: vi.fn().mockResolvedValue(undefined) };
     const { app } = createTestApp({ verification });
-    const response = await app.request("/auth/verify/otp", {
+    const response = await request(app, "/auth/verify/otp", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ challengeId: "challenge-1", code: "123456" }),
