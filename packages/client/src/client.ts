@@ -57,7 +57,7 @@ export class AuthClient {
     return result;
   }
 
-  async getTokens(): Promise<{ accessToken: string; refreshToken: string } | null> {
+  async getTokens(): Promise<AuthTokensSnapshot | null> {
     return this.storage.get();
   }
 
@@ -128,7 +128,7 @@ export class AuthClient {
 
     if (!response.ok) {
       const code = this.extractErrorCode(payload);
-      const message = this.extractErrorMessage(payload) ?? response.statusText || `HTTP ${response.status}`;
+      const message = this.extractErrorMessage(payload) ?? response.statusText ?? `HTTP ${response.status}`;
       throw new AuthClientError(response.status, message, code, payload);
     }
 
@@ -149,6 +149,8 @@ export class AuthClient {
     return typeof value === "string" ? value : null;
   }
 }
+
+type AuthTokensSnapshot = Awaited<ReturnType<TokenStorage["get"]>>;
 
 export function createAuthClient(options: AuthClientOptions): AuthClient {
   return new AuthClient(options);
