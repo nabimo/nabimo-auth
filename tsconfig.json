@@ -13,13 +13,15 @@
       "@nabimo-auth/core": ["packages/core/src/index.ts"],
       "@nabimo-auth/core/*": ["packages/core/src/*"],
       "@nabimo-auth/database": ["packages/database/src/index.ts"],
-      "@nabimo-auth/database/*": ["packages/database/src/*"]
+      "@nabimo-auth/database/*": ["packages/database/src/*"],
+      "@nabimo-auth/protocol": ["packages/protocol/src/index.ts"]
     }
   },
   "files": [],
   "references": [
     { "path": "packages/core/tsconfig.json" },
     { "path": "packages/database/tsconfig.json" },
+    { "path": "packages/protocol/tsconfig.json" },
     { "path": "apps/auth-server/tsconfig.json" }
   ]
 }
