@@ -4,12 +4,16 @@ import type {
   AuthenticationResponse,
   LogoutAllResponse,
   LogoutResponse,
+  VerificationChallengeResponse,
+  VerificationSuccessResponse,
 } from "@nabimo-auth/protocol";
 
 export type AuthUser = AuthUserResponse;
 export type AuthenticationResult = AuthenticationResponse;
 export type LogoutResult = LogoutResponse;
 export type LogoutAllResult = LogoutAllResponse;
+export type VerificationChallengeResult = VerificationChallengeResponse;
+export type VerificationResult = VerificationSuccessResponse;
 export type { AuthErrorResponse };
 
 export interface AuthTokens {
