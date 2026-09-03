@@ -3,6 +3,7 @@ import {
   AccessTokenValidationService,
   AuthError,
   AuthService,
+  PasswordResetService,
   RefreshService,
   SessionManagementService,
   VerificationService,
@@ -11,6 +12,8 @@ import type {
   AuthenticationResponse,
   LogoutAllResponse,
   LogoutResponse,
+  PasswordResetConfirmResponse,
+  PasswordResetRequestResponse,
   VerificationChallengeResponse,
   VerificationSuccessResponse,
 } from "../api-contract.js";
@@ -21,33 +24,28 @@ export interface AuthRouteDependencies {
   refresh: RefreshService;
   sessionManagement: SessionManagementService;
   verification?: VerificationService;
+  passwordReset?: PasswordResetService;
   users?: { findById(id: string): Promise<{ id: string; email: string | null } | null> };
 }
 
-export function createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, users }: AuthRouteDependencies) {
+export function createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, users }: AuthRouteDependencies) {
   const router = createRouter();
 
   router.post("/register", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
     const body = await readBody<{ email?: unknown; password?: unknown }>(event);
-    if (typeof body?.email !== "string" || typeof body?.password !== "string") {
-      throw httpError(400, "INVALID_REQUEST", "Email and password are required");
-    }
+    if (typeof body?.email !== "string" || typeof body?.password !== "string") throw httpError(400, "INVALID_REQUEST", "Email and password are required");
     return auth.registerWithPassword(body.email, body.password);
   })));
 
   router.post("/login/password", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
     const body = await readBody<{ email?: unknown; password?: unknown }>(event);
-    if (typeof body?.email !== "string" || typeof body?.password !== "string") {
-      throw httpError(400, "INVALID_REQUEST", "Email and password are required");
-    }
+    if (typeof body?.email !== "string" || typeof body?.password !== "string") throw httpError(400, "INVALID_REQUEST", "Email and password are required");
     return auth.loginWithPassword(body.email, body.password);
   })));
 
   router.post("/refresh", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
     const body = await readBody<{ refreshToken?: unknown }>(event);
-    if (typeof body?.refreshToken !== "string" || body.refreshToken.length === 0) {
-      throw httpError(400, "INVALID_REQUEST", "Refresh token is required");
-    }
+    if (typeof body?.refreshToken !== "string" || body.refreshToken.length === 0) throw httpError(400, "INVALID_REQUEST", "Refresh token is required");
     return refresh.refresh(body.refreshToken);
   })));
 
@@ -74,28 +72,33 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
     const { claims } = await accessTokens.validate(token);
     const body = await readBody<{ email?: unknown }>(event);
     if (typeof body?.email !== "string") throw httpError(400, "INVALID_REQUEST", "Email is required");
-
     const user = await users.findById(claims.sub);
-    if (!user?.email || user.email.toLowerCase() !== body.email.trim().toLowerCase()) {
-      throw httpError(400, "INVALID_REQUEST", "Email does not belong to the authenticated user");
-    }
-
+    if (!user?.email || user.email.toLowerCase() !== body.email.trim().toLowerCase()) throw httpError(400, "INVALID_REQUEST", "Email does not belong to the authenticated user");
     const challenge = await verification.requestEmailOtp(user.id, user.email);
-    return {
-      challengeId: challenge.challengeId,
-      type: challenge.type,
-      target: challenge.target,
-      expiresAt: challenge.expiresAt.toISOString(),
-    };
+    return { challengeId: challenge.challengeId, type: challenge.type, target: challenge.target, expiresAt: challenge.expiresAt.toISOString() };
   })));
 
   router.post("/verify/otp", eventHandler(async (event) => withAuthErrors<VerificationSuccessResponse>(async () => {
     if (!verification) throw httpError(501, "NOT_CONFIGURED", "OTP verification is not configured");
     const body = await readBody<{ challengeId?: unknown; code?: unknown }>(event);
-    if (typeof body?.challengeId !== "string" || typeof body?.code !== "string" || !/^\d{6}$/.test(body.code)) {
-      throw httpError(400, "INVALID_REQUEST", "Challenge ID and a 6-digit code are required");
-    }
+    if (typeof body?.challengeId !== "string" || typeof body?.code !== "string" || !/^\d{6}$/.test(body.code)) throw httpError(400, "INVALID_REQUEST", "Challenge ID and a 6-digit code are required");
     await verification.verifyOtp(body.challengeId, body.code);
+    return { success: true };
+  })));
+
+  router.post("/password/reset/request", eventHandler(async (event) => withAuthErrors<PasswordResetRequestResponse>(async () => {
+    if (!passwordReset) throw httpError(501, "NOT_CONFIGURED", "Password reset is not configured");
+    const body = await readBody<{ email?: unknown }>(event);
+    if (typeof body?.email !== "string") throw httpError(400, "INVALID_REQUEST", "Email is required");
+    await passwordReset.request(body.email);
+    return { success: true };
+  })));
+
+  router.post("/password/reset/confirm", eventHandler(async (event) => withAuthErrors<PasswordResetConfirmResponse>(async () => {
+    if (!passwordReset) throw httpError(501, "NOT_CONFIGURED", "Password reset is not configured");
+    const body = await readBody<{ token?: unknown; newPassword?: unknown }>(event);
+    if (typeof body?.token !== "string" || typeof body?.newPassword !== "string") throw httpError(400, "INVALID_REQUEST", "Reset token and new password are required");
+    await passwordReset.confirm(body.token, body.newPassword);
     return { success: true };
   })));
 
@@ -103,23 +106,16 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
 }
 
 async function withAuthErrors<T>(handler: () => Promise<T>): Promise<T> {
-  try {
-    return await handler();
-  } catch (error) {
+  try { return await handler(); }
+  catch (error) {
     if (isHttpError(error)) throw error;
     if (error instanceof AuthError) throw httpError(authErrorStatus(error.code), error.code, error.message);
     throw error;
   }
 }
 
-function httpError(statusCode: number, code: string, message: string) {
-  return createError({ statusCode, statusMessage: message, data: { code } });
-}
-
-function isHttpError(error: unknown): error is { statusCode: number } {
-  return typeof error === "object" && error !== null && "statusCode" in error;
-}
-
+function httpError(statusCode: number, code: string, message: string) { return createError({ statusCode, statusMessage: message, data: { code } }); }
+function isHttpError(error: unknown): error is { statusCode: number } { return typeof error === "object" && error !== null && "statusCode" in error; }
 function authErrorStatus(code: string): number {
   switch (code) {
     case "ACCOUNT_ALREADY_EXISTS": return 409;
@@ -127,12 +123,12 @@ function authErrorStatus(code: string): number {
     case "OTP_RATE_LIMITED": return 429;
     case "INVALID_CREDENTIALS":
     case "INVALID_OTP":
+    case "INVALID_PASSWORD_RESET_TOKEN":
     case "INVALID_2FA_CODE":
     case "TWO_FACTOR_REQUIRED": return 401;
     default: return 400;
   }
 }
-
 function getBearerToken(event: H3Event): string | null {
   const authorization = getHeader(event, "authorization");
   if (!authorization) return null;

@@ -10,14 +10,8 @@ export interface AuthenticationResponse {
   refreshToken: string;
 }
 
-export interface LogoutResponse {
-  success: true;
-}
-
-export interface LogoutAllResponse {
-  success: true;
-  revokedSessions: number;
-}
+export interface LogoutResponse { success: true; }
+export interface LogoutAllResponse { success: true; revokedSessions: number; }
 
 export interface VerificationChallengeResponse {
   challengeId: string;
@@ -26,32 +20,17 @@ export interface VerificationChallengeResponse {
   expiresAt: string;
 }
 
-export interface VerificationSuccessResponse {
-  success: true;
-}
+export interface VerificationSuccessResponse { success: true; }
+export interface PasswordResetRequest { email: string; }
+export interface PasswordResetConfirmRequest { token: string; newPassword: string; }
+export interface PasswordResetRequestResponse { success: true; }
+export interface PasswordResetConfirmResponse { success: true; }
 
-export interface RegisterRequest {
-  email: string;
-  password: string;
-}
-
-export interface PasswordLoginRequest {
-  email: string;
-  password: string;
-}
-
-export interface RefreshRequest {
-  refreshToken: string;
-}
-
-export interface EmailVerificationRequest {
-  email: string;
-}
-
-export interface VerifyOtpRequest {
-  challengeId: string;
-  code: string;
-}
+export interface RegisterRequest { email: string; password: string; }
+export interface PasswordLoginRequest { email: string; password: string; }
+export interface RefreshRequest { refreshToken: string; }
+export interface EmailVerificationRequest { email: string; }
+export interface VerifyOtpRequest { challengeId: string; code: string; }
 
 export type AuthErrorCode =
   | "INVALID_REQUEST"
@@ -60,14 +39,12 @@ export type AuthErrorCode =
   | "INVALID_OTP"
   | "OTP_COOLDOWN"
   | "OTP_RATE_LIMITED"
+  | "INVALID_PASSWORD_RESET_TOKEN"
   | "TWO_FACTOR_REQUIRED"
   | "INVALID_2FA_CODE"
   | "NOT_CONFIGURED";
 
-export interface AuthErrorData {
-  code?: AuthErrorCode;
-}
-
+export interface AuthErrorData { code?: AuthErrorCode; }
 export interface AuthErrorResponse {
   statusCode?: number;
   statusMessage?: string;
@@ -83,4 +60,6 @@ export const AUTH_ENDPOINTS = {
   logoutAll: "POST /auth/logout-all",
   requestEmailVerification: "POST /auth/verify/email/request",
   verifyOtp: "POST /auth/verify/otp",
+  requestPasswordReset: "POST /auth/password/reset/request",
+  confirmPasswordReset: "POST /auth/password/reset/confirm",
 } as const;

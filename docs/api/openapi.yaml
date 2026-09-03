@@ -13,19 +13,11 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/PasswordCredentials'
+            schema: { $ref: '#/components/schemas/PasswordCredentials' }
       responses:
-        '200':
-          description: User registered and authenticated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationResponse'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '409':
-          $ref: '#/components/responses/AccountAlreadyExists'
+        '200': { description: User registered and authenticated., content: { application/json: { schema: { $ref: '#/components/schemas/AuthenticationResponse' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '409': { $ref: '#/components/responses/AccountAlreadyExists' }
   /auth/login/password:
     post:
       operationId: loginWithPassword
@@ -33,19 +25,11 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/PasswordCredentials'
+            schema: { $ref: '#/components/schemas/PasswordCredentials' }
       responses:
-        '200':
-          description: User authenticated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationResponse'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/InvalidCredentials'
+        '200': { description: User authenticated., content: { application/json: { schema: { $ref: '#/components/schemas/AuthenticationResponse' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/refresh:
     post:
       operationId: refresh
@@ -53,69 +37,38 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/RefreshRequest'
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
       responses:
-        '200':
-          description: Tokens rotated and a new access token issued.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuthenticationResponse'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/InvalidCredentials'
+        '200': { description: Tokens rotated., content: { application/json: { schema: { $ref: '#/components/schemas/AuthenticationResponse' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/logout:
     post:
       operationId: logout
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
-        '200':
-          description: Current session revoked.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          $ref: '#/components/responses/InvalidCredentials'
+        '200': { description: Current session revoked., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/logout-all:
     post:
       operationId: logoutAll
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
-        '200':
-          description: All active sessions for the authenticated user were revoked.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LogoutAllResponse'
-        '401':
-          $ref: '#/components/responses/InvalidCredentials'
+        '200': { description: All active sessions revoked., content: { application/json: { schema: { $ref: '#/components/schemas/LogoutAllResponse' } } } }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/verify/email/request:
     post:
       operationId: requestEmailVerification
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/EmailVerificationRequest'
+            schema: { $ref: '#/components/schemas/EmailVerificationRequest' }
       responses:
-        '200':
-          description: Email verification OTP was created and dispatched.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/VerificationChallengeResponse'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          $ref: '#/components/responses/InvalidCredentials'
+        '200': { description: Email verification OTP dispatched., content: { application/json: { schema: { $ref: '#/components/schemas/VerificationChallengeResponse' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/verify/otp:
     post:
       operationId: verifyOtp
@@ -123,23 +76,36 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: '#/components/schemas/VerifyOtpRequest'
+            schema: { $ref: '#/components/schemas/VerifyOtpRequest' }
       responses:
-        '200':
-          description: OTP verified successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '400':
-          $ref: '#/components/responses/InvalidRequest'
-        '401':
-          description: OTP is invalid, expired, or exhausted.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+        '200': { description: OTP verified., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { description: OTP invalid or expired., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /auth/password/reset/request:
+    post:
+      operationId: requestPasswordReset
+      description: Always returns the same success response for known and unknown email addresses.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetRequest' }
+      responses:
+        '200': { description: Reset request accepted., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '429': { description: Reset request rate limited., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+  /auth/password/reset/confirm:
+    post:
+      operationId: confirmPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PasswordResetConfirmRequest' }
+      responses:
+        '200': { description: Password changed and all existing sessions revoked., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { description: Reset token invalid or expired., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
 components:
   securitySchemes:
     bearerAuth:
@@ -151,119 +117,80 @@ components:
       type: object
       required: [email, password]
       properties:
-        email:
-          type: string
-          format: email
-        password:
-          type: string
-          format: password
+        email: { type: string, format: email }
+        password: { type: string, format: password }
     RefreshRequest:
       type: object
       required: [refreshToken]
-      properties:
-        refreshToken:
-          type: string
-          minLength: 1
+      properties: { refreshToken: { type: string, minLength: 1 } }
     EmailVerificationRequest:
       type: object
       required: [email]
-      properties:
-        email:
-          type: string
-          format: email
+      properties: { email: { type: string, format: email } }
     VerifyOtpRequest:
       type: object
       required: [challengeId, code]
       properties:
-        challengeId:
-          type: string
-          format: uuid
-        code:
-          type: string
-          pattern: '^\\d{6}$'
+        challengeId: { type: string, format: uuid }
+        code: { type: string, pattern: '^\\d{6}$' }
+    PasswordResetRequest:
+      type: object
+      required: [email]
+      properties: { email: { type: string, format: email } }
+    PasswordResetConfirmRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token: { type: string, minLength: 32 }
+        newPassword: { type: string, format: password, minLength: 8, maxLength: 128 }
     VerificationChallengeResponse:
       type: object
       required: [challengeId, type, target, expiresAt]
       properties:
-        challengeId:
-          type: string
-          format: uuid
-        type:
-          type: string
-          enum: [email_otp, phone_otp]
-        target:
-          type: string
-        expiresAt:
-          type: string
-          format: date-time
+        challengeId: { type: string, format: uuid }
+        type: { type: string, enum: [email_otp, phone_otp] }
+        target: { type: string }
+        expiresAt: { type: string, format: date-time }
     User:
       type: object
       required: [id, email]
       properties:
-        id:
-          type: string
-          format: uuid
-        email:
-          type: string
-          format: email
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
     AuthenticationResponse:
       type: object
       required: [user, sessionId, accessToken, refreshToken]
       properties:
-        user:
-          $ref: '#/components/schemas/User'
-        sessionId:
-          type: string
-          format: uuid
-        accessToken:
-          type: string
-        refreshToken:
-          type: string
+        user: { $ref: '#/components/schemas/User' }
+        sessionId: { type: string, format: uuid }
+        accessToken: { type: string }
+        refreshToken: { type: string }
     SuccessResponse:
       type: object
       required: [success]
-      properties:
-        success:
-          type: boolean
-          enum: [true]
+      properties: { success: { type: boolean, enum: [true] } }
     LogoutAllResponse:
       allOf:
-        - $ref: '#/components/schemas/SuccessResponse'
+        - { $ref: '#/components/schemas/SuccessResponse' }
         - type: object
           required: [revokedSessions]
-          properties:
-            revokedSessions:
-              type: integer
-              minimum: 0
+          properties: { revokedSessions: { type: integer, minimum: 0 } }
     ErrorResponse:
       type: object
       description: H3 error response. The stable Nabimo error code is exposed in data.code.
       properties:
-        statusCode:
-          type: integer
-        status:
-          type: integer
+        statusCode: { type: integer }
+        status: { type: integer }
         data:
           type: object
-          properties:
-            code:
-              type: string
+          properties: { code: { type: string } }
   responses:
     InvalidRequest:
       description: Request body is malformed or required fields are missing.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     InvalidCredentials:
       description: Authentication credentials are invalid or the session is no longer active.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }
     AccountAlreadyExists:
       description: An account already exists for the supplied email.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
+      content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } }

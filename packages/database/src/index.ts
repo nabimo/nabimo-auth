@@ -10,6 +10,7 @@ export * from "./prisma-session-store.js";
 export * from "./prisma-refresh-token-store.js";
 export * from "./prisma-session-management-store.js";
 export * from "./prisma-verification-store.js";
+export * from "./prisma-password-reset-store.js";
 
 let client: PrismaClient | undefined;
 

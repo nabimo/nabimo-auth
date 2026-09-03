@@ -6,3 +6,4 @@ export * from "./registration.js";
 export * from "./service-contracts.js";
 export * from "./service.js";
 export * from "./verification.js";
+export * from "./password-reset.js";

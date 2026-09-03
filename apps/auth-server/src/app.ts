@@ -1,7 +1,7 @@
 import { createApp, eventHandler, toNodeListener } from "h3";
 import { createServer } from "node:http";
 import { createPublicKey } from "node:crypto";
-import { AuthService, AccessTokenValidationService, RefreshService, SessionManagementService, VerificationService } from "@nabimo-auth/core";
+import { AuthService, AccessTokenValidationService, PasswordResetService, RefreshService, SessionManagementService, VerificationService } from "@nabimo-auth/core";
 import {
   getDatabaseClient,
   UserRepository,
@@ -10,10 +10,12 @@ import {
   PrismaSessionManagementStore,
   PrismaRefreshTokenStore,
   PrismaVerificationStore,
+  PrismaPasswordResetStore,
 } from "@nabimo-auth/database";
 import { createAuthRouter } from "@nabimo-auth/server";
 import { loadConfig } from "./config.js";
 import { ConsoleVerificationCodeSender } from "./verification-sender.js";
+import { ConsolePasswordResetSender } from "./password-reset-sender.js";
 
 export function createAuthApp() {
   const config = loadConfig();
@@ -24,23 +26,24 @@ export function createAuthApp() {
   const sessionManagementStore = new PrismaSessionManagementStore(db);
   const refreshTokenStore = new PrismaRefreshTokenStore(db);
   const verificationStore = new PrismaVerificationStore(db);
-  const verification = new VerificationService({
-    store: verificationStore,
-    sender: new ConsoleVerificationCodeSender(),
+  const verification = new VerificationService({ store: verificationStore, sender: new ConsoleVerificationCodeSender() });
+  const passwordResetStore = new PrismaPasswordResetStore(db);
+  const sessionManagement = new SessionManagementService(sessionManagementStore);
+  const passwordReset = new PasswordResetService({
+    store: passwordResetStore,
+    sender: new ConsolePasswordResetSender(),
+    findUserByEmail: async (email) => users.findByEmail(email),
+    revokeAllSessions: (userId) => sessionManagement.revokeAllSessions(userId),
   });
   const publicKeyPem = createPublicKey(config.jwtPrivateKeyPem).export({ type: "spki", format: "pem" }).toString();
 
   const auth = new AuthService({
-    users,
-    sessions,
-    registration,
+    users, sessions, registration,
     jwtPrivateKeyPem: config.jwtPrivateKeyPem,
     jwtKeyId: config.jwtKeyId,
     issuer: config.issuer,
     audience: config.audience,
   });
-
-  const sessionManagement = new SessionManagementService(sessionManagementStore);
   const refresh = new RefreshService({
     refreshTokens: refreshTokenStore,
     jwtPrivateKeyPem: config.jwtPrivateKeyPem,
@@ -57,8 +60,7 @@ export function createAuthApp() {
 
   const app = createApp();
   app.use("/health", eventHandler(() => ({ status: "ok" })));
-  app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, users }).handler);
-
+  app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, users }).handler);
   return { app, db };
 }
 

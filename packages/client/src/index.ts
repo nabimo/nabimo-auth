@@ -9,5 +9,9 @@ export type {
   AuthenticationResult,
   LogoutAllResult,
   LogoutResult,
+  PasswordResetConfirmResult,
+  PasswordResetRequestResult,
   TokenStorage,
+  VerificationChallengeResult,
+  VerificationResult,
 } from "./types.js";
