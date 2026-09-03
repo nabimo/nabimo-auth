@@ -4,11 +4,14 @@
   "description": "Framework-independent authentication primitives for Nabimo Auth.",
   "license": "MIT",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./crypto": "./src/crypto/index.ts"
+    ".": "./dist/index.js",
+    "./crypto": "./dist/crypto/index.js"
   },
   "scripts": {
+    "build": "tsc",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
