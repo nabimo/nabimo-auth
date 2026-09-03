@@ -1,79 +1,103 @@
-import {
-  createError,
-  createRouter,
-  eventHandler,
-  getHeader,
-  readBody,
-  type H3Event,
-} from "h3";
+import { createError, createRouter, eventHandler, getHeader, readBody, type H3Event } from "h3";
 import {
   AccessTokenValidationService,
   AuthError,
   AuthService,
   RefreshService,
   SessionManagementService,
+  VerificationService,
 } from "@nabimo-auth/core";
-import type { AuthenticationResponse, LogoutAllResponse, LogoutResponse } from "../api-contract.js";
+import type {
+  AuthenticationResponse,
+  LogoutAllResponse,
+  LogoutResponse,
+  VerificationChallengeResponse,
+  VerificationSuccessResponse,
+} from "../api-contract.js";
 
 export interface AuthRouteDependencies {
   auth: AuthService;
   accessTokens: AccessTokenValidationService;
   refresh: RefreshService;
   sessionManagement: SessionManagementService;
+  verification?: VerificationService;
+  users?: { findById(id: string): Promise<{ id: string; email: string | null } | null> };
 }
 
-export function createAuthRouter({ auth, accessTokens, refresh, sessionManagement }: AuthRouteDependencies) {
+export function createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, users }: AuthRouteDependencies) {
   const router = createRouter();
 
-  router.post("/register", eventHandler(async (event) => {
-    return withAuthErrors<AuthenticationResponse>(async () => {
-      const body = await readBody<{ email?: unknown; password?: unknown }>(event);
-      if (typeof body?.email !== "string" || typeof body?.password !== "string") {
-        throw httpError(400, "INVALID_REQUEST", "Email and password are required");
-      }
-      return auth.registerWithPassword(body.email, body.password);
-    });
-  }));
+  router.post("/register", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
+    const body = await readBody<{ email?: unknown; password?: unknown }>(event);
+    if (typeof body?.email !== "string" || typeof body?.password !== "string") {
+      throw httpError(400, "INVALID_REQUEST", "Email and password are required");
+    }
+    return auth.registerWithPassword(body.email, body.password);
+  })));
 
-  router.post("/login/password", eventHandler(async (event) => {
-    return withAuthErrors<AuthenticationResponse>(async () => {
-      const body = await readBody<{ email?: unknown; password?: unknown }>(event);
-      if (typeof body?.email !== "string" || typeof body?.password !== "string") {
-        throw httpError(400, "INVALID_REQUEST", "Email and password are required");
-      }
-      return auth.loginWithPassword(body.email, body.password);
-    });
-  }));
+  router.post("/login/password", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
+    const body = await readBody<{ email?: unknown; password?: unknown }>(event);
+    if (typeof body?.email !== "string" || typeof body?.password !== "string") {
+      throw httpError(400, "INVALID_REQUEST", "Email and password are required");
+    }
+    return auth.loginWithPassword(body.email, body.password);
+  })));
 
-  router.post("/refresh", eventHandler(async (event) => {
-    return withAuthErrors<AuthenticationResponse>(async () => {
-      const body = await readBody<{ refreshToken?: unknown }>(event);
-      if (typeof body?.refreshToken !== "string" || body.refreshToken.length === 0) {
-        throw httpError(400, "INVALID_REQUEST", "Refresh token is required");
-      }
-      return refresh.refresh(body.refreshToken);
-    });
-  }));
+  router.post("/refresh", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
+    const body = await readBody<{ refreshToken?: unknown }>(event);
+    if (typeof body?.refreshToken !== "string" || body.refreshToken.length === 0) {
+      throw httpError(400, "INVALID_REQUEST", "Refresh token is required");
+    }
+    return refresh.refresh(body.refreshToken);
+  })));
 
-  router.post("/logout", eventHandler(async (event) => {
-    return withAuthErrors<LogoutResponse>(async () => {
-      const token = getBearerToken(event);
-      if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
-      const { claims } = await accessTokens.validate(token);
-      await sessionManagement.logout(claims.sid);
-      return { success: true };
-    });
-  }));
+  router.post("/logout", eventHandler(async (event) => withAuthErrors<LogoutResponse>(async () => {
+    const token = getBearerToken(event);
+    if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
+    const { claims } = await accessTokens.validate(token);
+    await sessionManagement.logout(claims.sid);
+    return { success: true };
+  })));
 
-  router.post("/logout-all", eventHandler(async (event) => {
-    return withAuthErrors<LogoutAllResponse>(async () => {
-      const token = getBearerToken(event);
-      if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
-      const { claims } = await accessTokens.validate(token);
-      const revokedSessions = await sessionManagement.logoutAll(claims.sub);
-      return { success: true, revokedSessions };
-    });
-  }));
+  router.post("/logout-all", eventHandler(async (event) => withAuthErrors<LogoutAllResponse>(async () => {
+    const token = getBearerToken(event);
+    if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
+    const { claims } = await accessTokens.validate(token);
+    const revokedSessions = await sessionManagement.logoutAll(claims.sub);
+    return { success: true, revokedSessions };
+  })));
+
+  router.post("/verify/email/request", eventHandler(async (event) => withAuthErrors<VerificationChallengeResponse>(async () => {
+    if (!verification || !users) throw httpError(501, "NOT_CONFIGURED", "Email verification is not configured");
+    const token = getBearerToken(event);
+    if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
+    const { claims } = await accessTokens.validate(token);
+    const body = await readBody<{ email?: unknown }>(event);
+    if (typeof body?.email !== "string") throw httpError(400, "INVALID_REQUEST", "Email is required");
+
+    const user = await users.findById(claims.sub);
+    if (!user?.email || user.email.toLowerCase() !== body.email.trim().toLowerCase()) {
+      throw httpError(400, "INVALID_REQUEST", "Email does not belong to the authenticated user");
+    }
+
+    const challenge = await verification.requestEmailOtp(user.id, user.email);
+    return {
+      challengeId: challenge.challengeId,
+      type: challenge.type,
+      target: challenge.target,
+      expiresAt: challenge.expiresAt.toISOString(),
+    };
+  })));
+
+  router.post("/verify/otp", eventHandler(async (event) => withAuthErrors<VerificationSuccessResponse>(async () => {
+    if (!verification) throw httpError(501, "NOT_CONFIGURED", "OTP verification is not configured");
+    const body = await readBody<{ challengeId?: unknown; code?: unknown }>(event);
+    if (typeof body?.challengeId !== "string" || typeof body?.code !== "string" || !/^\d{6}$/.test(body.code)) {
+      throw httpError(400, "INVALID_REQUEST", "Challenge ID and a 6-digit code are required");
+    }
+    await verification.verifyOtp(body.challengeId, body.code);
+    return { success: true };
+  })));
 
   return router;
 }
@@ -83,9 +107,7 @@ async function withAuthErrors<T>(handler: () => Promise<T>): Promise<T> {
     return await handler();
   } catch (error) {
     if (isHttpError(error)) throw error;
-    if (error instanceof AuthError) {
-      throw httpError(authErrorStatus(error.code), error.code, error.message);
-    }
+    if (error instanceof AuthError) throw httpError(authErrorStatus(error.code), error.code, error.message);
     throw error;
   }
 }
