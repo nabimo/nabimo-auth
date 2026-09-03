@@ -1,5 +1,20 @@
 import { MemoryTokenStorage } from "./storage.js";
-import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type AuthTokens, type LogoutAllResult, type LogoutResult, type TokenStorage } from "./types.js";
+import {
+  AuthClientError,
+  type AuthClientOptions,
+  type AuthRequestOptions,
+  type AuthenticationResult,
+  type AuthTokens,
+  type LogoutAllResult,
+  type LogoutResult,
+  type TokenStorage,
+} from "./types.js";
+import type {
+  AuthErrorResponse,
+  PasswordLoginRequest,
+  RefreshRequest,
+  RegisterRequest,
+} from "@nabimo-auth/protocol";
 
 const JSON_CONTENT_TYPE = "application/json";
 
@@ -24,19 +39,24 @@ export class AuthClient {
   }
 
   async register(email: string, password: string): Promise<AuthenticationResult> {
-    return this.authenticate("/auth/register", { email, password });
+    const body: RegisterRequest = { email, password };
+    return this.authenticate("/auth/register", body);
   }
 
   async loginWithPassword(email: string, password: string): Promise<AuthenticationResult> {
-    return this.authenticate("/auth/login/password", { email, password });
+    const body: PasswordLoginRequest = { email, password };
+    return this.authenticate("/auth/login/password", body);
   }
 
   async refresh(): Promise<AuthenticationResult> {
     const tokens = await this.storage.get();
-    if (!tokens?.refreshToken) throw new AuthClientError(401, "No refresh token available", "INVALID_CREDENTIALS", null);
+    if (!tokens?.refreshToken) {
+      throw new AuthClientError(401, "No refresh token available", "INVALID_CREDENTIALS", null);
+    }
 
     try {
-      const result = await this.post<AuthenticationResult>("/auth/refresh", { refreshToken: tokens.refreshToken });
+      const body: RefreshRequest = { refreshToken: tokens.refreshToken };
+      const result = await this.post<AuthenticationResult>("/auth/refresh", body);
       await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       return result;
     } catch (error) {
@@ -75,7 +95,9 @@ export class AuthClient {
 
     if (options.auth ?? false) {
       const accessToken = (await this.storage.get())?.accessToken;
-      if (!accessToken) throw new AuthClientError(401, "No access token available", "INVALID_CREDENTIALS", null);
+      if (!accessToken) {
+        throw new AuthClientError(401, "No access token available", "INVALID_CREDENTIALS", null);
+      }
       headers.set("Authorization", `Bearer ${accessToken}`);
     }
 
@@ -104,7 +126,7 @@ export class AuthClient {
     return this.parseResponse<T>(response);
   }
 
-  private async authenticate(path: string, body: { email: string; password: string }): Promise<AuthenticationResult> {
+  private async authenticate(path: string, body: RegisterRequest | PasswordLoginRequest): Promise<AuthenticationResult> {
     const result = await this.post<AuthenticationResult>(path, body);
     await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
     return result;
@@ -133,7 +155,7 @@ export class AuthClient {
 
     if (!response.ok) {
       const code = this.extractErrorCode(payload);
-      const message = this.extractErrorMessage(payload) ?? response.statusText ?? `HTTP ${response.status}`;
+      const message = (this.extractErrorMessage(payload) ?? response.statusText) || `HTTP ${response.status}`;
       throw new AuthClientError(response.status, message, code, payload);
     }
 
@@ -142,15 +164,15 @@ export class AuthClient {
 
   private extractErrorCode(payload: unknown): string | null {
     if (!payload || typeof payload !== "object") return null;
-    const data = (payload as { data?: unknown }).data;
-    if (!data || typeof data !== "object") return null;
-    const code = (data as { code?: unknown }).code;
+    const data = (payload as AuthErrorResponse).data;
+    const code = data?.code;
     return typeof code === "string" ? code : null;
   }
 
   private extractErrorMessage(payload: unknown): string | null {
     if (!payload || typeof payload !== "object") return null;
-    const value = (payload as { statusMessage?: unknown; message?: unknown }).statusMessage ?? (payload as { message?: unknown }).message;
+    const error = payload as AuthErrorResponse;
+    const value = error.statusMessage ?? error.message;
     return typeof value === "string" ? value : null;
   }
 }
