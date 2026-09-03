@@ -1,5 +1,5 @@
 import { MemoryTokenStorage } from "./storage.js";
-import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type LogoutAllResult, type LogoutResult, type TokenStorage } from "./types.js";
+import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type AuthTokens, type LogoutAllResult, type LogoutResult, type TokenStorage } from "./types.js";
 
 const JSON_CONTENT_TYPE = "application/json";
 
@@ -57,7 +57,7 @@ export class AuthClient {
     return result;
   }
 
-  async getTokens(): Promise<AuthTokensSnapshot | null> {
+  async getTokens(): Promise<AuthTokens | null> {
     return this.storage.get();
   }
 
@@ -73,8 +73,7 @@ export class AuthClient {
     const headers = new Headers(this.defaultHeaders);
     new Headers(options.headers).forEach((value, key) => headers.set(key, value));
 
-    const auth = options.auth ?? false;
-    if (auth) {
+    if (options.auth ?? false) {
       const accessToken = (await this.storage.get())?.accessToken;
       if (!accessToken) throw new AuthClientError(401, "No access token available", "INVALID_CREDENTIALS", null);
       headers.set("Authorization", `Bearer ${accessToken}`);
@@ -82,7 +81,13 @@ export class AuthClient {
 
     let body: BodyInit | undefined;
     if (options.body !== undefined) {
-      if (typeof options.body === "string" || options.body instanceof FormData || options.body instanceof URLSearchParams || options.body instanceof Blob || options.body instanceof ArrayBuffer) {
+      if (
+        typeof options.body === "string" ||
+        options.body instanceof FormData ||
+        options.body instanceof URLSearchParams ||
+        options.body instanceof Blob ||
+        options.body instanceof ArrayBuffer
+      ) {
         body = options.body;
       } else {
         body = JSON.stringify(options.body);
@@ -149,8 +154,6 @@ export class AuthClient {
     return typeof value === "string" ? value : null;
   }
 }
-
-type AuthTokensSnapshot = Awaited<ReturnType<TokenStorage["get"]>>;
 
 export function createAuthClient(options: AuthClientOptions): AuthClient {
   return new AuthClient(options);
