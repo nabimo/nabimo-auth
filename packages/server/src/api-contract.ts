@@ -1,4 +1,5 @@
 export type {
+  AuthErrorCode,
   AuthErrorData,
   AuthErrorResponse,
   AuthUserResponse,

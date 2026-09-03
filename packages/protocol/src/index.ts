@@ -53,8 +53,19 @@ export interface VerifyOtpRequest {
   code: string;
 }
 
+export type AuthErrorCode =
+  | "INVALID_REQUEST"
+  | "INVALID_CREDENTIALS"
+  | "ACCOUNT_ALREADY_EXISTS"
+  | "INVALID_OTP"
+  | "OTP_COOLDOWN"
+  | "OTP_RATE_LIMITED"
+  | "TWO_FACTOR_REQUIRED"
+  | "INVALID_2FA_CODE"
+  | "NOT_CONFIGURED";
+
 export interface AuthErrorData {
-  code?: string;
+  code?: AuthErrorCode;
 }
 
 export interface AuthErrorResponse {

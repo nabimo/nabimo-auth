@@ -16,8 +16,32 @@ export interface VerificationRecord {
   attempts: number;
 }
 
+export interface OtpIssuancePolicy {
+  cooldownSeconds: number;
+  maxRequests: number;
+  requestWindowSeconds: number;
+  maxActiveChallenges: number;
+}
+
 export interface VerificationStore {
-  create(input: { id: string; userId: string | null; type: OtpVerificationType; target: string; codeHash: string; expiresAt: Date }): Promise<void>;
+  create(input: {
+    id: string;
+    userId: string | null;
+    type: OtpVerificationType;
+    target: string;
+    codeHash: string;
+    expiresAt: Date;
+  }): Promise<void>;
+  createWithPolicy(input: {
+    id: string;
+    userId: string | null;
+    type: OtpVerificationType;
+    target: string;
+    codeHash: string;
+    expiresAt: Date;
+    now: Date;
+    policy: OtpIssuancePolicy;
+  }): Promise<void>;
   findActive(id: string, now: Date): Promise<VerificationRecord | null>;
   incrementAttempts(id: string): Promise<void>;
   consume(id: string, now: Date): Promise<void>;
@@ -40,15 +64,23 @@ export interface VerificationServiceConfig {
   sender: VerificationCodeSender;
   ttlSeconds?: number;
   maxAttempts?: number;
+  otpPolicy?: Partial<OtpIssuancePolicy>;
 }
 
 export class VerificationService {
   private readonly ttlSeconds: number;
   private readonly maxAttempts: number;
+  private readonly otpPolicy: OtpIssuancePolicy;
 
   constructor(private readonly config: VerificationServiceConfig) {
     this.ttlSeconds = config.ttlSeconds ?? 10 * 60;
     this.maxAttempts = config.maxAttempts ?? 5;
+    this.otpPolicy = {
+      cooldownSeconds: config.otpPolicy?.cooldownSeconds ?? 60,
+      maxRequests: config.otpPolicy?.maxRequests ?? 5,
+      requestWindowSeconds: config.otpPolicy?.requestWindowSeconds ?? 60 * 60,
+      maxActiveChallenges: config.otpPolicy?.maxActiveChallenges ?? 3,
+    };
   }
 
   async requestEmailOtp(userId: string | null, emailInput: string): Promise<OtpChallenge> {
@@ -76,11 +108,21 @@ export class VerificationService {
   }
 
   private async requestOtp(userId: string | null, type: OtpVerificationType, target: string): Promise<OtpChallenge> {
+    const now = new Date();
     const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
     const challengeId = randomUUID();
-    const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
+    const expiresAt = new Date(now.getTime() + this.ttlSeconds * 1000);
 
-    await this.config.store.create({ id: challengeId, userId, type, target, codeHash: sha256(code), expiresAt });
+    await this.config.store.createWithPolicy({
+      id: challengeId,
+      userId,
+      type,
+      target,
+      codeHash: sha256(code),
+      expiresAt,
+      now,
+      policy: this.otpPolicy,
+    });
     await this.config.sender.send({ type, target, code });
 
     return { challengeId, type, target, expiresAt };

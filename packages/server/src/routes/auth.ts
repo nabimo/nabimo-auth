@@ -123,6 +123,8 @@ function isHttpError(error: unknown): error is { statusCode: number } {
 function authErrorStatus(code: string): number {
   switch (code) {
     case "ACCOUNT_ALREADY_EXISTS": return 409;
+    case "OTP_COOLDOWN":
+    case "OTP_RATE_LIMITED": return 429;
     case "INVALID_CREDENTIALS":
     case "INVALID_OTP":
     case "INVALID_2FA_CODE":
