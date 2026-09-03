@@ -5,3 +5,4 @@ export * from "./credentials.js";
 export * from "./registration.js";
 export * from "./service-contracts.js";
 export * from "./service.js";
+export * from "./verification.js";
