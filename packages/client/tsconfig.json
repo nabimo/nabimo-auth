@@ -4,7 +4,10 @@
     "rootDir": "src",
     "outDir": "dist",
     "noEmit": false,
-    "declaration": true
+    "declaration": true,
+    "paths": {
+      "@nabimo-auth/protocol": ["../protocol/dist/index.d.ts"]
+    }
   },
   "include": ["src"]
 }
