@@ -141,3 +141,14 @@ model RecoveryCode {
 
   @@index([userId])
 }
+
+model RateLimitBucket {
+  id              String   @id @default(uuid())
+  key             String
+  windowStartedAt DateTime
+  count           Int      @default(0)
+  updatedAt       DateTime @updatedAt
+
+  @@unique([key, windowStartedAt])
+  @@index([updatedAt])
+}
