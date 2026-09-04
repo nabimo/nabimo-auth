@@ -25,7 +25,7 @@ export interface AuthRouteDependencies {
   sessionManagement: SessionManagementService;
   verification?: VerificationService;
   passwordReset?: PasswordResetService;
-  users?: { findById(id: string): Promise<{ id: string; email: string | null } | null> };
+  users?: { findById(id: string): Promise<{ id: string; email: string | null; phone: string | null } | null> };
 }
 
 export function createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, users }: AuthRouteDependencies) {
@@ -75,6 +75,19 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
     const user = await users.findById(claims.sub);
     if (!user?.email || user.email.toLowerCase() !== body.email.trim().toLowerCase()) throw httpError(400, "INVALID_REQUEST", "Email does not belong to the authenticated user");
     const challenge = await verification.requestEmailOtp(user.id, user.email);
+    return { challengeId: challenge.challengeId, type: challenge.type, target: challenge.target, expiresAt: challenge.expiresAt.toISOString() };
+  })));
+
+  router.post("/verify/phone/request", eventHandler(async (event) => withAuthErrors<VerificationChallengeResponse>(async () => {
+    if (!verification || !users) throw httpError(501, "NOT_CONFIGURED", "Phone verification is not configured");
+    const token = getBearerToken(event);
+    if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
+    const { claims } = await accessTokens.validate(token);
+    const body = await readBody<{ phone?: unknown }>(event);
+    if (typeof body?.phone !== "string") throw httpError(400, "INVALID_REQUEST", "Phone is required");
+    const user = await users.findById(claims.sub);
+    if (!user?.phone || user.phone !== body.phone.trim()) throw httpError(400, "INVALID_REQUEST", "Phone does not belong to the authenticated user");
+    const challenge = await verification.requestPhoneOtp(user.id, user.phone);
     return { challengeId: challenge.challengeId, type: challenge.type, target: challenge.target, expiresAt: challenge.expiresAt.toISOString() };
   })));
 
