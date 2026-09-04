@@ -10,6 +10,7 @@ export interface AuthServerConfig {
   jwtKeyId: string;
   issuer: string;
   audience: string;
+  twoFactorEncryptionKey: string;
 }
 
 export function loadConfig(): AuthServerConfig {
@@ -19,5 +20,6 @@ export function loadConfig(): AuthServerConfig {
     jwtKeyId: process.env.NABIMO_JWT_KEY_ID ?? "default",
     issuer: process.env.NABIMO_JWT_ISSUER ?? "nabimo-auth",
     audience: process.env.NABIMO_JWT_AUDIENCE ?? "nabimo-auth-client",
+    twoFactorEncryptionKey: required("NABIMO_2FA_ENCRYPTION_KEY"),
   };
 }
