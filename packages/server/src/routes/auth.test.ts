@@ -9,7 +9,7 @@ function createTestApp(overrides: Record<string, unknown> = {}) {
       registerWithPassword: vi.fn().mockResolvedValue({ ok: true }),
       loginWithPassword: vi.fn().mockResolvedValue({ ok: true }),
     },
-    accessTokens: { validate: vi.fn() },
+    accessTokens: { validate: vi.fn().mockResolvedValue({ claims: { sub: "user-1", sid: "session-1" } }) },
     refresh: { refresh: vi.fn().mockResolvedValue({ ok: true }) },
     sessionManagement: {
       logout: vi.fn().mockResolvedValue(undefined),
@@ -93,6 +93,45 @@ describe("auth server contract", () => {
     expect(response.status).toBe(401);
     expect((await response.json()).data?.code).toBe("INVALID_CREDENTIALS");
     expect(verification.requestEmailOtp).not.toHaveBeenCalled();
+  });
+
+  it("requires bearer authentication for phone verification requests", async () => {
+    const verification = { requestPhoneOtp: vi.fn(), verifyOtp: vi.fn() };
+    const users = { findById: vi.fn() };
+    const { app } = createTestApp({ verification, users });
+    const response = await request(app, "/auth/verify/phone/request", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ phone: "+12025550123" }),
+    });
+    expect(response.status).toBe(401);
+    expect((await response.json()).data?.code).toBe("INVALID_CREDENTIALS");
+    expect(verification.requestPhoneOtp).not.toHaveBeenCalled();
+  });
+
+  it("requests a phone verification OTP for the authenticated user's phone", async () => {
+    const challenge = {
+      challengeId: "challenge-1",
+      type: "phone_otp" as const,
+      target: "+12025550123",
+      expiresAt: new Date(Date.now() + 60_000),
+    };
+    const verification = { requestPhoneOtp: vi.fn().mockResolvedValue(challenge), verifyOtp: vi.fn() };
+    const users = { findById: vi.fn().mockResolvedValue({ id: "user-1", email: null, phone: "+12025550123" }) };
+    const { app } = createTestApp({ verification, users });
+    const response = await request(app, "/auth/verify/phone/request", {
+      method: "POST",
+      headers: { authorization: "Bearer access-token", "content-type": "application/json" },
+      body: JSON.stringify({ phone: "+12025550123" }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      challengeId: "challenge-1",
+      type: "phone_otp",
+      target: "+12025550123",
+      expiresAt: challenge.expiresAt.toISOString(),
+    });
+    expect(verification.requestPhoneOtp).toHaveBeenCalledWith("user-1", "+12025550123");
   });
 
   it("verifies a valid OTP through the verification service", async () => {
