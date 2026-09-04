@@ -6,6 +6,8 @@ import type {
   LogoutResponse,
   PasswordResetConfirmResponse,
   PasswordResetRequestResponse,
+  TwoFactorSetupResponse,
+  TwoFactorSuccessResponse,
   VerificationChallengeResponse,
   VerificationSuccessResponse,
 } from "@nabimo-auth/protocol";
@@ -18,6 +20,8 @@ export type VerificationChallengeResult = VerificationChallengeResponse;
 export type VerificationResult = VerificationSuccessResponse;
 export type PasswordResetRequestResult = PasswordResetRequestResponse;
 export type PasswordResetConfirmResult = PasswordResetConfirmResponse;
+export type TwoFactorSetupResult = TwoFactorSetupResponse;
+export type TwoFactorResult = TwoFactorSuccessResponse;
 export type { AuthErrorResponse };
 
 export interface AuthTokens { accessToken: string; refreshToken: string; }
