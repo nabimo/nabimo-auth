@@ -37,7 +37,8 @@ describe("RefreshService", () => {
       jwtKeyId: "test-key",
     });
 
-    const result = await service.refresh(original.token, new Date("2030-09-02T00:00:00.000Z"));
+    const now = new Date("2030-09-02T00:00:00.000Z");
+    const result = await service.refresh(original.token, now);
 
     expect(rotationInput?.familyId).toBe("family-1");
     expect(rotationInput?.tokenHash).toBe(original.tokenHash);
@@ -47,7 +48,7 @@ describe("RefreshService", () => {
     expect(result.refreshToken).not.toBe(original.token);
     expect(hashRefreshToken(result.refreshToken)).not.toBe(original.tokenHash);
 
-    const claims = verifyAccessToken(result.accessToken, keys.publicKeyPem);
+    const claims = verifyAccessToken(result.accessToken, keys.publicKeyPem, Math.floor(now.getTime() / 1000));
     expect(claims?.sub).toBe("user-1");
     expect(claims?.sid).toBe("session-1");
   });
