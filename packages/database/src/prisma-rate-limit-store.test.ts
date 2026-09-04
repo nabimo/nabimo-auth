@@ -27,7 +27,7 @@ function createDbMock(): DbMock {
   let nextId = 0;
 
   const db: DbMock = {
-    async $transaction<T>(callback) {
+    async $transaction<T>(callback: (tx: DbMock) => Promise<T>) {
       return callback(db);
     },
     async $executeRaw() {
