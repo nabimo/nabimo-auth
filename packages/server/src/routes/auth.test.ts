@@ -109,7 +109,7 @@ describe("auth server contract", () => {
     expect(verification.requestPhoneOtp).not.toHaveBeenCalled();
   });
 
-  it("requests a phone verification OTP for the authenticated user's phone", async () => {
+  it("requests a normalized phone verification OTP for the authenticated user's phone", async () => {
     const challenge = {
       challengeId: "challenge-1",
       type: "phone_otp" as const,
@@ -122,7 +122,7 @@ describe("auth server contract", () => {
     const response = await request(app, "/auth/verify/phone/request", {
       method: "POST",
       headers: { authorization: "Bearer access-token", "content-type": "application/json" },
-      body: JSON.stringify({ phone: "+12025550123" }),
+      body: JSON.stringify({ phone: "+1 (202) 555-0123" }),
     });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -132,6 +132,20 @@ describe("auth server contract", () => {
       expiresAt: challenge.expiresAt.toISOString(),
     });
     expect(verification.requestPhoneOtp).toHaveBeenCalledWith("user-1", "+12025550123");
+  });
+
+  it("rejects an invalid phone number", async () => {
+    const verification = { requestPhoneOtp: vi.fn(), verifyOtp: vi.fn() };
+    const users = { findById: vi.fn() };
+    const { app } = createTestApp({ verification, users });
+    const response = await request(app, "/auth/verify/phone/request", {
+      method: "POST",
+      headers: { authorization: "Bearer access-token", "content-type": "application/json" },
+      body: JSON.stringify({ phone: "not-a-phone" }),
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).data?.code).toBe("INVALID_REQUEST");
+    expect(verification.requestPhoneOtp).not.toHaveBeenCalled();
   });
 
   it("verifies a valid OTP through the verification service", async () => {
