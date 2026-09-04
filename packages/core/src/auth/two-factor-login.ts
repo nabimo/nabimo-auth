@@ -8,7 +8,7 @@ export interface TwoFactorLoginChallenge { challengeToken: string; userId: strin
 export interface TwoFactorLoginStore {
   create(input: { id: string; userId: string; tokenHash: string; expiresAt: Date }): Promise<void>;
   find(input: { tokenHash: string; now: Date }): Promise<{ userId: string } | null>;
-  incrementAttempts(input: { tokenHash: string; now: Date }): Promise<boolean>;
+  incrementAttempts(input: { tokenHash: string; now: Date; maxAttempts: number }): Promise<boolean>;
   consume(input: { tokenHash: string; now: Date }): Promise<boolean>;
 }
 export interface TwoFactorLoginServiceConfig {
@@ -20,8 +20,10 @@ export interface TwoFactorLoginServiceConfig {
 
 export class TwoFactorLoginService {
   private readonly ttlSeconds: number;
+  private readonly maxAttempts: number;
   constructor(private readonly config: TwoFactorLoginServiceConfig) {
     this.ttlSeconds = config.ttlSeconds ?? 5 * 60;
+    this.maxAttempts = config.maxAttempts ?? 5;
   }
   async configuredForUser(userId: string): Promise<boolean> { return this.config.twoFactor.isEnabled(userId); }
   async createChallenge(userId: string): Promise<TwoFactorLoginChallenge> {
@@ -37,7 +39,7 @@ export class TwoFactorLoginService {
     const now = new Date();
     const challenge = await this.config.store.find({ tokenHash, now });
     if (!challenge) throw authErrors.invalidTwoFactorCode();
-    if (!await this.config.store.incrementAttempts({ tokenHash, now })) throw authErrors.invalidTwoFactorCode();
+    if (!await this.config.store.incrementAttempts({ tokenHash, now, maxAttempts: this.maxAttempts })) throw authErrors.invalidTwoFactorCode();
 
     try {
       await this.config.twoFactor.verify(challenge.userId, code);
