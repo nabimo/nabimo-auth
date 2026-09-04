@@ -34,6 +34,26 @@ describe("AuthClient", () => {
     expect(request.headers.get("Authorization")).toBe("Bearer access-token");
   });
 
+  it("sends the access token when requesting phone verification", async () => {
+    const fetch = vi.fn().mockResolvedValue(response({
+      challengeId: "challenge-1",
+      type: "phone_otp",
+      target: "+12025550123",
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+    }));
+    const storage = {
+      get: vi.fn().mockResolvedValue({ accessToken: "access-token", refreshToken: "refresh-token" }),
+      set: vi.fn(),
+      clear: vi.fn(),
+    };
+    const client = new AuthClient({ baseUrl: "https://auth.example.com", fetch, storage });
+
+    await expect(client.requestPhoneVerification("+12025550123")).resolves.toMatchObject({ type: "phone_otp" });
+    expect(fetch.mock.calls[0][0]).toBe("https://auth.example.com/auth/verify/phone/request");
+    expect(fetch.mock.calls[0][1].body).toBe(JSON.stringify({ phone: "+12025550123" }));
+    expect(fetch.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer access-token");
+  });
+
   it("verifies an OTP without requiring authentication", async () => {
     const fetch = vi.fn().mockResolvedValue(response({ success: true }));
     const client = new AuthClient({ baseUrl: "https://auth.example.com", fetch });
