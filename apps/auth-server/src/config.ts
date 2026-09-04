@@ -11,6 +11,7 @@ export interface AuthServerConfig {
   issuer: string;
   audience: string;
   twoFactorEncryptionKey: string;
+  trustedProxyIps: string[];
 }
 
 export function loadConfig(): AuthServerConfig {
@@ -21,5 +22,9 @@ export function loadConfig(): AuthServerConfig {
     issuer: process.env.NABIMO_JWT_ISSUER ?? "nabimo-auth",
     audience: process.env.NABIMO_JWT_AUDIENCE ?? "nabimo-auth-client",
     twoFactorEncryptionKey: required("NABIMO_2FA_ENCRYPTION_KEY"),
+    trustedProxyIps: (process.env.NABIMO_TRUSTED_PROXY_IPS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
   };
 }
