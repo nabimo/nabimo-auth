@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { generateJwtKeyPair, signAccessToken, verifyAccessToken } from "./jwt.js";
+import { describe, expect, it } from "vitest";
+import { generateJwtKeyPair, signAccessToken, verifyAccessToken, type AccessTokenClaims } from "./jwt.js";
 
 describe("JWT access token validation", () => {
   const now = 1_800_000_000;
@@ -45,5 +46,23 @@ describe("JWT access token validation", () => {
   it("rejects malformed timestamp values", () => {
     expect(verifyAccessToken(token({ iat: Number.MAX_SAFE_INTEGER + 1 }), keyPair.publicKeyPem, now)).toBeNull();
     expect(verifyAccessToken(token({ exp: Number.MAX_SAFE_INTEGER + 1 }), keyPair.publicKeyPem, now)).toBeNull();
+  });
+
+  it("rejects claims with invalid types", () => {
+    const malformed = signAccessToken(
+      {
+        sub: 123,
+        sid: "session-1",
+        jti: "token-1",
+        iat: now,
+        exp: now + 900,
+        iss: "nabimo-auth",
+        aud: "nabimo-auth-client",
+      } as unknown as AccessTokenClaims,
+      keyPair.privateKeyPem,
+      "test-key",
+    );
+
+    expect(verifyAccessToken(malformed, keyPair.publicKeyPem, now)).toBeNull();
   });
 });
