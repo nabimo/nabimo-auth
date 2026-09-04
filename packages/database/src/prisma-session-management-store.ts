@@ -45,25 +45,17 @@ export class PrismaSessionManagementStore implements SessionManagementStore {
 
   async revokeAllSessions(userId: string, now: Date): Promise<number> {
     return this.db.$transaction(async (tx) => {
-      const sessions = await tx.session.findMany({
-        where: { userId, revokedAt: null },
-        select: { id: true },
-      });
-      if (sessions.length === 0) return 0;
-
-      const sessionIds = sessions.map(({ id }) => id);
-
-      await tx.session.updateMany({
+      const result = await tx.session.updateMany({
         where: { userId, revokedAt: null },
         data: { revokedAt: now },
       });
 
       await tx.refreshToken.updateMany({
-        where: { sessionId: { in: sessionIds }, revokedAt: null },
+        where: { userId, revokedAt: null },
         data: { revokedAt: now },
       });
 
-      return sessions.length;
+      return result.count;
     });
   }
 }
