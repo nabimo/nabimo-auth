@@ -9,20 +9,26 @@ export class AuthClient {
   private readonly requestFetch: typeof globalThis.fetch;
   private readonly storage: TokenStorage;
   private readonly defaultHeaders: HeadersInit;
+  private refreshPromise: Promise<AuthenticationResult> | null = null;
+
   constructor(options: AuthClientOptions) {
     if (!options.baseUrl || typeof options.baseUrl !== "string") throw new TypeError("baseUrl is required");
     this.baseUrl = options.baseUrl.replace(/\/$/, ""); this.requestFetch = options.fetch ?? globalThis.fetch;
     if (typeof this.requestFetch !== "function") throw new TypeError("A fetch implementation is required");
     this.storage = options.storage ?? new MemoryTokenStorage(); this.defaultHeaders = options.headers ?? {};
   }
+
   async register(email: string, password: string): Promise<AuthenticationResult> { return this.authenticate<AuthenticationResult>("/auth/register", { email, password } satisfies RegisterRequest); }
   async loginWithPassword(email: string, password: string): Promise<PasswordLoginResult> { return this.authenticate<PasswordLoginResult>("/auth/login/password", { email, password } satisfies PasswordLoginRequest); }
   async loginWithTwoFactor(challengeToken: string, code: string): Promise<AuthenticationResult> { return this.authenticate<AuthenticationResult>("/auth/2fa/login", { challengeToken, code } satisfies TwoFactorLoginRequest); }
+
   async refresh(): Promise<AuthenticationResult> {
-    const tokens = await this.storage.get(); if (!tokens?.refreshToken) throw new AuthClientError(401, "No refresh token available", "INVALID_CREDENTIALS", null);
-    try { const result = await this.post<AuthenticationResult>("/auth/refresh", { refreshToken: tokens.refreshToken } satisfies RefreshRequest); await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken }); return result; }
-    catch (error) { if (error instanceof AuthClientError && error.status === 401) await this.storage.clear(); throw error; }
+    if (this.refreshPromise) return this.refreshPromise;
+    this.refreshPromise = this.performRefresh();
+    try { return await this.refreshPromise; }
+    finally { this.refreshPromise = null; }
   }
+
   async requestEmailVerification(email: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/email/request", { email }, true); }
   async requestPhoneVerification(phone: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/phone/request", { phone } satisfies PhoneVerificationRequest, true); }
   async verifyOtp(challengeId: string, code: string): Promise<VerificationResult> { return this.post<VerificationResult>("/auth/verify/otp", { challengeId, code }); }
@@ -36,13 +42,44 @@ export class AuthClient {
   async getTokens(): Promise<AuthTokens | null> { return this.storage.get(); }
   async getAccessToken(): Promise<string | null> { return (await this.storage.get())?.accessToken ?? null; }
   async clearTokens(): Promise<void> { await this.storage.clear(); }
+
   async request<T>(path: string, options: AuthRequestOptions = {}): Promise<T> {
     const headers = new Headers(this.defaultHeaders); new Headers(options.headers).forEach((value, key) => headers.set(key, value));
-    if (options.auth ?? false) { const accessToken = (await this.storage.get())?.accessToken; if (!accessToken) throw new AuthClientError(401, "No access token available", "INVALID_CREDENTIALS", null); headers.set("Authorization", `Bearer ${accessToken}`); }
+    const authenticated = options.auth ?? false;
+    if (authenticated) {
+      const accessToken = (await this.storage.get())?.accessToken;
+      if (!accessToken) throw new AuthClientError(401, "No access token available", "INVALID_CREDENTIALS", null);
+      headers.set("Authorization", `Bearer ${accessToken}`);
+    }
     let body: BodyInit | undefined;
     if (options.body !== undefined) { if (typeof options.body === "string" || options.body instanceof FormData || options.body instanceof URLSearchParams || options.body instanceof Blob || options.body instanceof ArrayBuffer) body = options.body; else { body = JSON.stringify(options.body); if (!headers.has("Content-Type")) headers.set("Content-Type", JSON_CONTENT_TYPE); } }
-    const response = await this.requestFetch(this.resolve(path), { ...options, body, headers }); return this.parseResponse<T>(response);
+
+    const response = await this.requestFetch(this.resolve(path), { ...options, body, headers });
+    if (authenticated && response.status === 401) {
+      await this.refresh();
+      const retryHeaders = new Headers(this.defaultHeaders); new Headers(options.headers).forEach((value, key) => retryHeaders.set(key, value));
+      const accessToken = (await this.storage.get())?.accessToken;
+      if (!accessToken) throw new AuthClientError(401, "No access token available", "INVALID_CREDENTIALS", null);
+      retryHeaders.set("Authorization", `Bearer ${accessToken}`);
+      const retryResponse = await this.requestFetch(this.resolve(path), { ...options, body, headers: retryHeaders });
+      return this.parseResponse<T>(retryResponse);
+    }
+    return this.parseResponse<T>(response);
   }
+
+  private async performRefresh(): Promise<AuthenticationResult> {
+    const tokens = await this.storage.get();
+    if (!tokens?.refreshToken) throw new AuthClientError(401, "No refresh token available", "INVALID_CREDENTIALS", null);
+    try {
+      const result = await this.post<AuthenticationResult>("/auth/refresh", { refreshToken: tokens.refreshToken } satisfies RefreshRequest);
+      await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      return result;
+    } catch (error) {
+      if (error instanceof AuthClientError && error.status === 401) await this.storage.clear();
+      throw error;
+    }
+  }
+
   private async authenticate<T extends AuthenticationResult | PasswordLoginResult>(path: string, body: RegisterRequest | PasswordLoginRequest | TwoFactorLoginRequest): Promise<T> {
     const result = await this.post<T>(path, body);
     if ("accessToken" in result) await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
