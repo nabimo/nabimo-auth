@@ -13,6 +13,7 @@
     "dev": "pnpm --filter @nabimo-auth/server dev",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
+    "test:integration": "pnpm --filter @nabimo-auth/auth-server test:integration",
     "typecheck": "pnpm -r typecheck",
     "format": "pnpm exec prettier --write ."
   },
