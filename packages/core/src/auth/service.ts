@@ -8,32 +8,16 @@ import { signAccessToken } from "../crypto/jwt.js";
 import type { TwoFactorLoginService } from "./two-factor-login.js";
 
 export interface RegistrationTransactionStore {
-  registerUser(input: {
-    email: string;
-    passwordHash: string;
-    sessionId: string;
-    familyId: string;
-    refreshTokenHash: string;
-    sessionExpiresAt: Date;
-  }): Promise<{ id: string; email: string | null }>;
+  registerUser(input: { email: string; passwordHash: string; sessionId: string; familyId: string; refreshTokenHash: string; sessionExpiresAt: Date }): Promise<{ id: string; email: string | null }>;
 }
 
 export interface AuthUserStore {
-  findByEmail(email: string): Promise<{
-    id: string;
-    email: string | null;
-    passwordCredential: { passwordHash: string } | null;
-  } | null>;
+  findByEmail(email: string): Promise<{ id: string; email: string | null; passwordCredential: { passwordHash: string } | null } | null>;
+  findById(id: string): Promise<{ id: string; email: string | null } | null>;
 }
 
 export interface SessionStore {
-  create(input: {
-    id: string;
-    userId: string;
-    familyId: string;
-    expiresAt: Date;
-    refreshTokenHash: string;
-  }): Promise<void>;
+  create(input: { id: string; userId: string; familyId: string; expiresAt: Date; refreshTokenHash: string }): Promise<void>;
 }
 
 export interface AuthServiceConfig {
@@ -61,18 +45,9 @@ export class AuthService {
     const email = normalizeEmail(emailInput);
     const existing = await this.config.users.findByEmail(email);
     if (existing) throw authErrors.accountAlreadyExists();
-
     const passwordHash = await createPasswordHash(password);
     const session = createSession();
-    const user = await this.config.registration.registerUser({
-      email,
-      passwordHash,
-      sessionId: session.sessionId,
-      familyId: session.familyId,
-      refreshTokenHash: session.refreshTokenHash,
-      sessionExpiresAt: session.expiresAt,
-    });
-
+    const user = await this.config.registration.registerUser({ email, passwordHash, sessionId: session.sessionId, familyId: session.familyId, refreshTokenHash: session.refreshTokenHash, sessionExpiresAt: session.expiresAt });
     return this.createAuthenticationResult(user.id, user.email ?? email, session);
   }
 
@@ -81,17 +56,11 @@ export class AuthService {
     const user = await this.config.users.findByEmail(email);
     const passwordHash = user?.passwordCredential?.passwordHash;
     if (!passwordHash) throw authErrors.invalidCredentials();
-
     await verifyUserPassword(password, passwordHash);
 
     if (this.config.twoFactorLogin && await this.config.twoFactorLogin.configuredForUser(user.id)) {
       const challenge = await this.config.twoFactorLogin.createChallenge(user.id);
-      return {
-        twoFactorRequired: true,
-        user: { id: user.id, email: user.email ?? email },
-        challengeToken: challenge.challengeToken,
-        challengeExpiresAt: challenge.expiresAt,
-      };
+      return { twoFactorRequired: true, user: { id: user.id, email: user.email ?? email }, challengeToken: challenge.challengeToken, challengeExpiresAt: challenge.expiresAt };
     }
 
     return this.createSessionResult(user.id, user.email ?? email);
@@ -100,41 +69,23 @@ export class AuthService {
   async completeTwoFactorLogin(challengeToken: string, code: string) {
     if (!this.config.twoFactorLogin) throw authErrors.invalidTwoFactorCode();
     const userId = await this.config.twoFactorLogin.verifyChallenge(challengeToken, code);
-    const user = await this.config.users.findById?.(userId);
+    const user = await this.config.users.findById(userId);
     if (!user) throw authErrors.invalidCredentials();
     return this.createSessionResult(user.id, user.email ?? "");
   }
 
   private async createSessionResult(userId: string, email: string) {
     const session = createSession();
-    await this.config.sessions.create({
-      id: session.sessionId,
-      userId,
-      familyId: session.familyId,
-      expiresAt: session.expiresAt,
-      refreshTokenHash: session.refreshTokenHash,
-    });
+    await this.config.sessions.create({ id: session.sessionId, userId, familyId: session.familyId, expiresAt: session.expiresAt, refreshTokenHash: session.refreshTokenHash });
     return this.createAuthenticationResult(userId, email, session);
   }
 
   private createAuthenticationResult(userId: string, email: string, session: ReturnType<typeof createSession>) {
-    const claims = createAccessTokenClaims(
-      userId,
-      session.sessionId,
-      randomUUID(),
-      Math.floor(Date.now() / 1000),
-      {
-        issuer: this.config.issuer ?? DEFAULT_ACCESS_TOKEN_POLICY.issuer,
-        audience: this.config.audience ?? DEFAULT_ACCESS_TOKEN_POLICY.audience,
-        ttlSeconds: DEFAULT_SESSION_POLICY.accessTokenTtlSeconds,
-      },
-    );
-
-    return {
-      user: { id: userId, email },
-      sessionId: session.sessionId,
-      accessToken: signAccessToken(claims, this.config.jwtPrivateKeyPem, this.config.jwtKeyId),
-      refreshToken: session.refreshToken,
-    };
+    const claims = createAccessTokenClaims(userId, session.sessionId, randomUUID(), Math.floor(Date.now() / 1000), {
+      issuer: this.config.issuer ?? DEFAULT_ACCESS_TOKEN_POLICY.issuer,
+      audience: this.config.audience ?? DEFAULT_ACCESS_TOKEN_POLICY.audience,
+      ttlSeconds: DEFAULT_SESSION_POLICY.accessTokenTtlSeconds,
+    });
+    return { user: { id: userId, email }, sessionId: session.sessionId, accessToken: signAccessToken(claims, this.config.jwtPrivateKeyPem, this.config.jwtKeyId), refreshToken: session.refreshToken };
   }
 }
