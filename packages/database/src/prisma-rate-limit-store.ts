@@ -24,8 +24,9 @@ export class PrismaRateLimitStore implements RateLimitStore {
 
     return this.db.$transaction(async (tx) => {
       // Serialize counters for the same key so concurrent requests cannot
-      // both observe the same count and exceed the configured limit.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`rate_limit:${input.key}`}))`;
+      // both observe the same count and exceed the configured limit. Use the
+      // 64-bit PostgreSQL hash to reduce unrelated-key lock collisions.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`rate_limit:${input.key}`}, 0))`;
 
       // Keep the bucket table bounded for keys that continue to be used.
       await tx.rateLimitBucket.deleteMany({
