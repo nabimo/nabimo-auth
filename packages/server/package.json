@@ -4,10 +4,21 @@
   "description": "HTTP server integration for Nabimo Auth.",
   "license": "MIT",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./routes/auth": "./dist/routes/auth.js",
-    "./contract": "./dist/api-contract.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./routes/auth": {
+      "types": "./dist/routes/auth.d.ts",
+      "import": "./dist/routes/auth.js"
+    },
+    "./contract": {
+      "types": "./dist/api-contract.d.ts",
+      "import": "./dist/api-contract.js"
+    }
   },
   "scripts": {
     "build": "tsc",
