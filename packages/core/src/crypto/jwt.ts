@@ -16,6 +16,8 @@ export interface AccessTokenClaims {
   jti: string;
 }
 
+const MAX_CLOCK_SKEW_SECONDS = 60;
+
 export function generateJwtKeyPair(): JwtKeyPair {
   const { privateKey, publicKey } = generateKeyPairSync("ed25519", {
     privateKeyEncoding: { type: "pkcs8", format: "pem" },
@@ -33,9 +35,13 @@ export function signAccessToken(claims: AccessTokenClaims, privateKeyPem: string
   return `${signingInput}.${base64Url(signature)}`;
 }
 
-export function verifyAccessToken(token: string, publicKeyPem: string): AccessTokenClaims | null {
+export function verifyAccessToken(
+  token: string,
+  publicKeyPem: string,
+  now = Math.floor(Date.now() / 1000),
+): AccessTokenClaims | null {
   const parts = token.split(".");
-  if (parts.length !== 3) return null;
+  if (parts.length !== 3 || !Number.isSafeInteger(now)) return null;
 
   try {
     const header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")) as { alg?: string; typ?: string };
@@ -50,8 +56,9 @@ export function verifyAccessToken(token: string, publicKeyPem: string): AccessTo
     );
 
     if (!valid || !payload.sub || !payload.sid || !payload.jti || !payload.iss || !payload.aud) return null;
-    if (!Number.isSafeInteger(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) return null;
-    if (!Number.isSafeInteger(payload.iat)) return null;
+    if (!Number.isSafeInteger(payload.exp) || !Number.isSafeInteger(payload.iat)) return null;
+    if (payload.exp <= now || payload.exp <= payload.iat) return null;
+    if (payload.iat > now + MAX_CLOCK_SKEW_SECONDS) return null;
 
     return payload;
   } catch {
