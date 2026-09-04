@@ -43,7 +43,8 @@ export interface VerificationStore {
     policy: OtpIssuancePolicy;
   }): Promise<void>;
   findActive(id: string, now: Date): Promise<VerificationRecord | null>;
-  incrementAttempts(id: string): Promise<void>;
+  /** Atomically increments attempts only while the challenge remains below the configured limit. */
+  incrementAttempts(id: string, maxAttempts: number): Promise<boolean>;
   /** Atomically consumes an active challenge. */
   consume(id: string, now: Date): Promise<boolean>;
   markVerified(userId: string, type: OtpVerificationType): Promise<void>;
@@ -100,7 +101,8 @@ export class VerificationService {
     }
 
     if (sha256(code) !== challenge.codeHash) {
-      await this.config.store.incrementAttempts(challengeId);
+      const incremented = await this.config.store.incrementAttempts(challengeId, this.maxAttempts);
+      if (!incremented) throw authErrors.invalidOtp();
       throw authErrors.invalidOtp();
     }
 
