@@ -42,6 +42,7 @@ paths:
         '200': { description: User authenticated after two-factor verification., content: { application/json: { schema: { $ref: '#/components/schemas/AuthenticationResponse' } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { description: Two-factor code or recovery code is invalid or the challenge has expired., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/refresh:
     post:
       operationId: refresh
@@ -82,6 +83,7 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
         '429': { description: OTP request rate limited., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/verify/phone/request:
     post:
       operationId: requestPhoneVerification
@@ -96,6 +98,7 @@ paths:
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
         '429': { description: OTP request rate limited., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/verify/otp:
     post:
       operationId: verifyOtp
@@ -108,6 +111,7 @@ paths:
         '200': { description: OTP verified., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { description: OTP invalid or expired., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/password/reset/request:
     post:
       operationId: requestPasswordReset
@@ -121,6 +125,7 @@ paths:
         '200': { description: Reset request accepted., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '429': { description: Reset request rate limited., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/password/reset/confirm:
     post:
       operationId: confirmPasswordReset
@@ -133,6 +138,7 @@ paths:
         '200': { description: Password changed and all existing sessions revoked., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { description: Reset token invalid or expired., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
+        '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/2fa/setup:
     post:
       operationId: setupTwoFactor
@@ -154,6 +160,7 @@ paths:
         '200': { description: Two-factor authentication enabled., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/2fa/disable:
     post:
       operationId: disableTwoFactor
@@ -167,6 +174,7 @@ paths:
         '200': { description: Two-factor authentication disabled., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '501': { $ref: '#/components/responses/NotConfigured' }
 components:
   securitySchemes:
     bearerAuth:
@@ -196,7 +204,7 @@ components:
       type: object
       required: [challengeId, code]
       properties:
-        challengeId: { type: string, format: uuid }
+        challengeId: { type: string, minLength: 1 }
         code: { type: string, pattern: '^\\d{6}$' }
     TwoFactorLoginRequest:
       type: object
@@ -232,22 +240,22 @@ components:
       type: object
       required: [challengeId, type, target, expiresAt]
       properties:
-        challengeId: { type: string, format: uuid }
+        challengeId: { type: string, minLength: 1 }
         type: { type: string, enum: [email_otp, phone_otp] }
         target: { type: string }
         expiresAt: { type: string, format: date-time }
     User:
       type: object
-      required: [id, email]
+      required: [id]
       properties:
-        id: { type: string, format: uuid }
-        email: { type: string, format: email }
+        id: { type: string }
+        email: { type: string, format: email, nullable: true }
     AuthenticationResponse:
       type: object
       required: [user, sessionId, accessToken, refreshToken]
       properties:
         user: { $ref: '#/components/schemas/User' }
-        sessionId: { type: string, format: uuid }
+        sessionId: { type: string }
         accessToken: { type: string }
         refreshToken: { type: string }
     SuccessResponse:
@@ -265,10 +273,14 @@ components:
       description: H3 error response. The stable Nabimo error code is exposed in data.code.
       properties:
         statusCode: { type: integer }
-        status: { type: integer }
+        statusMessage: { type: string }
+        message: { type: string }
         data:
           type: object
-          properties: { code: { type: string } }
+          properties:
+            code:
+              type: string
+              enum: [INVALID_REQUEST, INVALID_CREDENTIALS, ACCOUNT_ALREADY_EXISTS, INVALID_OTP, OTP_COOLDOWN, OTP_RATE_LIMITED, INVALID_PASSWORD_RESET_TOKEN, TWO_FACTOR_REQUIRED, INVALID_2FA_CODE, NOT_CONFIGURED]
   responses:
     InvalidRequest:
       description: Request body is malformed or required fields are missing.
