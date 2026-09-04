@@ -15,7 +15,6 @@ describe("PasswordResetService", () => {
       store,
       sender,
       findUserByEmail: vi.fn().mockResolvedValue(null),
-      revokeAllSessions: vi.fn(),
     });
 
     await expect(service.request("Unknown@Example.com")).resolves.toBeUndefined();
@@ -30,7 +29,6 @@ describe("PasswordResetService", () => {
       store,
       sender,
       findUserByEmail: vi.fn().mockResolvedValue({ id: "user-1", email: "user@example.com" }),
-      revokeAllSessions: vi.fn(),
     });
 
     await service.request(" USER@Example.com ");
@@ -44,29 +42,26 @@ describe("PasswordResetService", () => {
     expect(created.expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 
-  it("changes the password, consumes the token, and revokes all sessions", async () => {
+  it("changes the password and relies on the store for atomic session revocation", async () => {
     const store = createStore();
     const sender = createSender();
-    vi.mocked(store.consumeAndSetPassword).mockResolvedValue("user-1");
-    const revokeAllSessions = vi.fn().mockResolvedValue(2);
+    vi.mocked(store.consumeAndSetPassword).mockResolvedValue(true);
     const service = new PasswordResetService({
       store,
       sender,
       findUserByEmail: vi.fn(),
-      revokeAllSessions,
     });
 
     await service.confirm("a".repeat(64), "new-password-123");
     expect(store.consumeAndSetPassword).toHaveBeenCalledOnce();
     expect(vi.mocked(store.consumeAndSetPassword).mock.calls[0][0].passwordHash).not.toBe("new-password-123");
-    expect(revokeAllSessions).toHaveBeenCalledWith("user-1");
   });
 
   it("rejects an invalid or already-consumed token", async () => {
     const store = createStore();
     const sender = createSender();
-    vi.mocked(store.consumeAndSetPassword).mockResolvedValue(null);
-    const service = new PasswordResetService({ store, sender, findUserByEmail: vi.fn(), revokeAllSessions: vi.fn() });
+    vi.mocked(store.consumeAndSetPassword).mockResolvedValue(false);
+    const service = new PasswordResetService({ store, sender, findUserByEmail: vi.fn() });
 
     await expect(service.confirm("a".repeat(64), "new-password-123")).rejects.toMatchObject({ code: "INVALID_PASSWORD_RESET_TOKEN" });
   });
