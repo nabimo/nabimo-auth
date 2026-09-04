@@ -116,6 +116,7 @@ enum VerificationType {
   EMAIL_VERIFICATION
   PHONE_VERIFICATION
   PASSWORD_RESET
+  TWO_FACTOR_LOGIN
 }
 
 model TwoFactor {
