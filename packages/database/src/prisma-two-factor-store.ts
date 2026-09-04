@@ -46,7 +46,12 @@ export class PrismaTwoFactorStore implements TwoFactorStore {
 
   async consumeRecoveryCode(userId: string, codeHash: string, now: Date): Promise<boolean> {
     const result = await this.db.recoveryCode.updateMany({
-      where: { userId, codeHash, usedAt: null },
+      where: {
+        userId,
+        codeHash,
+        usedAt: null,
+        user: { twoFactor: { enabledAt: { not: null } } },
+      },
       data: { usedAt: now },
     });
     return result.count === 1;
