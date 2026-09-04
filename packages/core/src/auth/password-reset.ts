@@ -18,7 +18,7 @@ export interface PasswordResetStore {
     requestWindowSeconds: number;
     maxActiveChallenges: number;
   }): Promise<void>;
-  consumeAndSetPassword(input: { tokenHash: string; passwordHash: string; now: Date }): Promise<string | null>;
+  consumeAndSetPassword(input: { tokenHash: string; passwordHash: string; now: Date }): Promise<boolean>;
 }
 
 export interface PasswordResetSender {
@@ -29,7 +29,6 @@ export interface PasswordResetServiceConfig {
   store: PasswordResetStore;
   sender: PasswordResetSender;
   findUserByEmail(email: string): Promise<{ id: string; email: string | null } | null>;
-  revokeAllSessions(userId: string): Promise<number>;
   ttlSeconds?: number;
   cooldownSeconds?: number;
   maxRequests?: number;
@@ -78,12 +77,11 @@ export class PasswordResetService {
   async confirm(token: string, newPassword: string): Promise<void> {
     if (typeof token !== "string" || token.length < 32) throw authErrors.invalidPasswordResetToken();
     const passwordHash = await createPasswordHash(newPassword);
-    const userId = await this.config.store.consumeAndSetPassword({
+    const reset = await this.config.store.consumeAndSetPassword({
       tokenHash: sha256(token),
       passwordHash,
       now: new Date(),
     });
-    if (!userId) throw authErrors.invalidPasswordResetToken();
-    await this.config.revokeAllSessions(userId);
+    if (!reset) throw authErrors.invalidPasswordResetToken();
   }
 }
