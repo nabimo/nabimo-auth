@@ -14,7 +14,9 @@
       "@nabimo-auth/core/*": ["packages/core/dist/*"],
       "@nabimo-auth/database": ["packages/database/dist/index.d.ts"],
       "@nabimo-auth/database/*": ["packages/database/dist/*"],
-      "@nabimo-auth/protocol": ["packages/protocol/dist/index.d.ts"]
+      "@nabimo-auth/protocol": ["packages/protocol/dist/index.d.ts"],
+      "@nabimo-auth/server": ["packages/server/dist/index.d.ts"],
+      "@nabimo-auth/server/*": ["packages/server/dist/*"]
     }
   },
   "files": [],
