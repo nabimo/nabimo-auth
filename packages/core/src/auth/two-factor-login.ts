@@ -29,6 +29,10 @@ export class TwoFactorLoginService {
     this.ttlSeconds = config.ttlSeconds ?? 5 * 60;
   }
 
+  async configuredForUser(userId: string): Promise<boolean> {
+    return this.config.twoFactor.isEnabled(userId);
+  }
+
   async createChallenge(userId: string): Promise<TwoFactorLoginChallenge> {
     if (!await this.config.twoFactor.isEnabled(userId)) throw authErrors.invalidTwoFactorCode();
     const { token, hash } = generateToken(32);
