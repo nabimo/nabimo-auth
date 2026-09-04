@@ -40,6 +40,9 @@ export class PrismaTwoFactorStore implements TwoFactorStore {
     return this.db.$transaction(async (tx) => {
       const result = await tx.twoFactor.deleteMany({ where: { userId } });
       await tx.recoveryCode.deleteMany({ where: { userId } });
+      await tx.verification.deleteMany({
+        where: { userId, type: "TWO_FACTOR_LOGIN" },
+      });
       return result.count === 1;
     });
   }
