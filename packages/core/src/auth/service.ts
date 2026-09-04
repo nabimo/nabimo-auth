@@ -14,7 +14,7 @@ export interface RegistrationTransactionStore {
 
 export interface AuthUserStore {
   findByEmail(email: string): Promise<{ id: string; email: string | null; passwordCredential: { passwordHash: string } | null } | null>;
-  findById(id: string): Promise<{ id: string; email: string | null }>;
+  findById(id: string): Promise<{ id: string; email: string | null } | null>;
 }
 
 export interface SessionStore {
