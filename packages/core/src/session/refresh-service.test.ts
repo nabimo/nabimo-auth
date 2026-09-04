@@ -53,6 +53,42 @@ describe("RefreshService", () => {
     expect(claims?.sid).toBe("session-1");
   });
 
+  it("uses the configured access token TTL", async () => {
+    const keys = generateJwtKeyPair();
+    const original = createRefreshToken("family-1");
+    const now = new Date("2030-09-02T00:00:00.000Z");
+    const store: RefreshTokenStore = {
+      async getRefreshToken() {
+        return {
+          userId: "user-1",
+          email: null,
+          sessionId: "session-1",
+          familyId: "family-1",
+          sessionExpiresAt: new Date("2030-09-03T00:00:00.000Z"),
+          sessionRevokedAt: null,
+          expiresAt: new Date("2030-09-03T00:00:00.000Z"),
+          usedAt: null,
+          revokedAt: null,
+        };
+      },
+      async rotateRefreshToken() {
+        return true;
+      },
+    };
+
+    const service = new RefreshService({
+      refreshTokens: store,
+      jwtPrivateKeyPem: keys.privateKeyPem,
+      jwtKeyId: "test-key",
+      sessionPolicy: { accessTokenTtlSeconds: 300, refreshTokenTtlSeconds: 3600 },
+    });
+
+    const result = await service.refresh(original.token, now);
+    const claims = verifyAccessToken(result.accessToken, keys.publicKeyPem, Math.floor(now.getTime() / 1000));
+
+    expect(claims?.exp).toBe(Math.floor(now.getTime() / 1000) + 300);
+  });
+
   it("passes an already-used refresh token to the store for reuse detection", async () => {
     const keys = generateJwtKeyPair();
     const token = createRefreshToken("family-1");
