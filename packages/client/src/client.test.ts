@@ -33,8 +33,13 @@ describe("AuthClient", () => {
 
   it("refreshes after a 401 and retries with the new access token", async () => {
     const calls: string[] = [];
-    const storage = { get: vi.fn().mockResolvedValue({ accessToken: "old", refreshToken: "refresh" }), set: vi.fn(), clear: vi.fn() };
-    const fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+    let tokens = { accessToken: "old", refreshToken: "refresh" };
+    const storage = {
+      get: vi.fn().mockImplementation(async () => tokens),
+      set: vi.fn().mockImplementation(async (next) => { tokens = next; }),
+      clear: vi.fn(),
+    };
+    const fetch = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
       calls.push(url);
       if (url.endsWith("/auth/refresh")) return response({ accessToken: "new", refreshToken: "refresh-new", sessionId: "session-1" });
@@ -50,7 +55,12 @@ describe("AuthClient", () => {
   });
 
   it("deduplicates concurrent refresh requests", async () => {
-    const storage = { get: vi.fn().mockResolvedValue({ accessToken: "old", refreshToken: "refresh" }), set: vi.fn(), clear: vi.fn() };
+    let tokens = { accessToken: "old", refreshToken: "refresh" };
+    const storage = {
+      get: vi.fn().mockImplementation(async () => tokens),
+      set: vi.fn().mockImplementation(async (next) => { tokens = next; }),
+      clear: vi.fn(),
+    };
     let refreshCalls = 0;
     let protectedCalls = 0;
     let resolveRefresh!: (value: Response) => void;
