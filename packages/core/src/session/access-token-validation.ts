@@ -23,7 +23,10 @@ export class AccessTokenValidationService {
   constructor(private readonly config: AccessTokenValidationConfig) {}
 
   async validate(token: string, now = new Date()): Promise<ValidatedAccessToken> {
-    const claims = verifyAccessToken(token, this.config.publicKeyPem);
+    const nowSeconds = Math.floor(now.getTime() / 1000);
+    if (!Number.isSafeInteger(nowSeconds)) throw authErrors.invalidCredentials();
+
+    const claims = verifyAccessToken(token, this.config.publicKeyPem, nowSeconds);
     if (!claims) throw authErrors.invalidCredentials();
 
     const issuer = this.config.issuer ?? DEFAULT_ACCESS_TOKEN_POLICY.issuer;
