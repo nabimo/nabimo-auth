@@ -21,6 +21,11 @@ export class TwoFactorService {
   private readonly issuer: string;
   constructor(private readonly config: TwoFactorServiceConfig) { this.issuer = config.issuer ?? "Nabimo Auth"; }
 
+  async isEnabled(userId: string): Promise<boolean> {
+    const record = await this.config.store.get(userId);
+    return record?.enabledAt != null;
+  }
+
   async setup(userId: string, accountName: string): Promise<TwoFactorSetupResult> {
     const existing = await this.config.store.get(userId);
     if (existing?.enabledAt) throw new Error("Two-factor authentication is already enabled");
