@@ -75,8 +75,12 @@ export class PrismaVerificationStore implements VerificationStore {
     await this.db.verification.updateMany({ where: { id, consumedAt: null }, data: { attempts: { increment: 1 } } });
   }
 
-  async consume(id: string, now: Date): Promise<void> {
-    await this.db.verification.updateMany({ where: { id, consumedAt: null, expiresAt: { gt: now } }, data: { consumedAt: now } });
+  async consume(id: string, now: Date): Promise<boolean> {
+    const result = await this.db.verification.updateMany({
+      where: { id, consumedAt: null, expiresAt: { gt: now } },
+      data: { consumedAt: now },
+    });
+    return result.count === 1;
   }
 
   async markVerified(userId: string, type: OtpVerificationType): Promise<void> {
