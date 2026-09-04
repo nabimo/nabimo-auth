@@ -71,8 +71,12 @@ export class PrismaVerificationStore implements VerificationStore {
     return { id: record.id, userId: record.userId, type: toCoreType(record.type), target: record.target, codeHash: record.codeHash, expiresAt: record.expiresAt, consumedAt: record.consumedAt, attempts: record.attempts };
   }
 
-  async incrementAttempts(id: string): Promise<void> {
-    await this.db.verification.updateMany({ where: { id, consumedAt: null }, data: { attempts: { increment: 1 } } });
+  async incrementAttempts(id: string, maxAttempts: number): Promise<boolean> {
+    const result = await this.db.verification.updateMany({
+      where: { id, consumedAt: null, attempts: { lt: maxAttempts } },
+      data: { attempts: { increment: 1 } },
+    });
+    return result.count === 1;
   }
 
   async consume(id: string, now: Date): Promise<boolean> {
