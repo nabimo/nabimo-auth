@@ -52,7 +52,7 @@ describe("RefreshService", () => {
     expect(claims?.sid).toBe("session-1");
   });
 
-  it("rejects an already-used refresh token without rotating it", async () => {
+  it("passes an already-used refresh token to the store for reuse detection", async () => {
     const keys = generateJwtKeyPair();
     const token = createRefreshToken("family-1");
     let rotateCalled = false;
@@ -72,7 +72,7 @@ describe("RefreshService", () => {
       },
       async rotateRefreshToken() {
         rotateCalled = true;
-        return true;
+        return false;
       },
     };
 
@@ -82,8 +82,8 @@ describe("RefreshService", () => {
       jwtKeyId: "test-key",
     });
 
-    await expect(service.refresh(token.token)).rejects.toThrow("Invalid credentials");
-    expect(rotateCalled).toBe(false);
+    await expect(service.refresh(token.token, new Date("2026-09-02T00:00:00.000Z"))).rejects.toThrow("Invalid credentials");
+    expect(rotateCalled).toBe(true);
   });
 
   it("rejects an expired refresh token", async () => {
