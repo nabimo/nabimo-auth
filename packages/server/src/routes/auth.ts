@@ -1,6 +1,6 @@
 import { createError, createRouter, eventHandler, getHeader, readBody, type H3Event } from "h3";
-import { AccessTokenValidationService, AuthError, AuthService, normalizePhone, PasswordResetService, RefreshService, SessionManagementService, TwoFactorService, VerificationService } from "@nabimo-auth/core";
-import type { AuthenticationResponse, LogoutAllResponse, LogoutResponse, PasswordResetConfirmResponse, PasswordResetRequestResponse, TwoFactorSetupResponse, TwoFactorSuccessResponse, VerificationChallengeResponse, VerificationSuccessResponse } from "../api-contract.js";
+import { AccessTokenValidationService, AuthError, AuthService, normalizePhone, PasswordResetService, RefreshService, SessionManagementService, TwoFactorService, TwoFactorLoginService, VerificationService } from "@nabimo-auth/core";
+import type { AuthenticationResponse, LogoutAllResponse, LogoutResponse, PasswordLoginResponse, PasswordResetConfirmResponse, PasswordResetRequestResponse, TwoFactorCodeRequest, TwoFactorLoginRequest, TwoFactorSetupResponse, TwoFactorSuccessResponse, VerificationChallengeResponse, VerificationSuccessResponse } from "../api-contract.js";
 
 export interface AuthRouteDependencies {
   auth: AuthService;
@@ -10,10 +10,11 @@ export interface AuthRouteDependencies {
   verification?: VerificationService;
   passwordReset?: PasswordResetService;
   twoFactor?: TwoFactorService;
+  twoFactorLogin?: TwoFactorLoginService;
   users?: { findById(id: string): Promise<{ id: string; email: string | null; phone: string | null } | null> };
 }
 
-export function createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, twoFactor, users }: AuthRouteDependencies) {
+export function createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, twoFactor, twoFactorLogin, users }: AuthRouteDependencies) {
   const router = createRouter();
 
   router.post("/register", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
@@ -21,11 +22,22 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
     if (typeof body?.email !== "string" || typeof body?.password !== "string") throw httpError(400, "INVALID_REQUEST", "Email and password are required");
     return auth.registerWithPassword(body.email, body.password);
   })));
-  router.post("/login/password", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
+
+  router.post("/login/password", eventHandler(async (event) => withAuthErrors<PasswordLoginResponse>(async () => {
     const body = await readBody<{ email?: unknown; password?: unknown }>(event);
     if (typeof body?.email !== "string" || typeof body?.password !== "string") throw httpError(400, "INVALID_REQUEST", "Email and password are required");
-    return auth.loginWithPassword(body.email, body.password);
+    const result = await auth.loginWithPassword(body.email, body.password);
+    if ("twoFactorRequired" in result) return { ...result, challengeExpiresAt: result.challengeExpiresAt.toISOString() };
+    return result;
   })));
+
+  router.post("/2fa/login", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
+    if (!twoFactorLogin) throw httpError(501, "NOT_CONFIGURED", "Two-factor authentication is not configured");
+    const body = await readBody<TwoFactorLoginRequest>(event);
+    if (typeof body?.challengeToken !== "string" || typeof body?.code !== "string" || !/^\d{6}$/.test(body.code)) throw httpError(400, "INVALID_REQUEST", "Challenge token and a 6-digit code are required");
+    return auth.completeTwoFactorLogin(body.challengeToken, body.code);
+  })));
+
   router.post("/refresh", eventHandler(async (event) => withAuthErrors<AuthenticationResponse>(async () => {
     const body = await readBody<{ refreshToken?: unknown }>(event);
     if (typeof body?.refreshToken !== "string" || body.refreshToken.length === 0) throw httpError(400, "INVALID_REQUEST", "Refresh token is required");
@@ -92,14 +104,14 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
   router.post("/2fa/enable", eventHandler(async (event) => withAuthErrors<TwoFactorSuccessResponse>(async () => {
     if (!twoFactor) throw httpError(501, "NOT_CONFIGURED", "Two-factor authentication is not configured");
     const token = getBearerToken(event); if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
-    const { claims } = await accessTokens.validate(token); const body = await readBody<{ code?: unknown }>(event);
+    const { claims } = await accessTokens.validate(token); const body = await readBody<TwoFactorCodeRequest>(event);
     if (typeof body?.code !== "string" || !/^\d{6}$/.test(body.code)) throw httpError(400, "INVALID_REQUEST", "A 6-digit code is required");
     await twoFactor.enable(claims.sub, body.code); return { success: true };
   })));
   router.post("/2fa/disable", eventHandler(async (event) => withAuthErrors<TwoFactorSuccessResponse>(async () => {
     if (!twoFactor) throw httpError(501, "NOT_CONFIGURED", "Two-factor authentication is not configured");
     const token = getBearerToken(event); if (!token) throw httpError(401, "INVALID_CREDENTIALS", "Invalid credentials");
-    const { claims } = await accessTokens.validate(token); const body = await readBody<{ code?: unknown }>(event);
+    const { claims } = await accessTokens.validate(token); const body = await readBody<TwoFactorCodeRequest>(event);
     if (typeof body?.code !== "string" || !/^\d{6}$/.test(body.code)) throw httpError(400, "INVALID_REQUEST", "A 6-digit code is required");
     await twoFactor.verify(claims.sub, body.code); await twoFactor.disable(claims.sub); return { success: true };
   })));
