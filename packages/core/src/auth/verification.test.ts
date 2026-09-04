@@ -43,6 +43,22 @@ describe("VerificationService", () => {
     });
   });
 
+  it("normalizes and sends a phone OTP", async () => {
+    const store = createStore();
+    const sender = createSender();
+    const service = new VerificationService({ store, sender });
+
+    const challenge = await service.requestPhoneOtp("user-1", " +1 (202) 555-0123 ");
+
+    expect(challenge.type).toBe("phone_otp");
+    expect(challenge.target).toBe("+12025550123");
+    const sent = vi.mocked(sender.send).mock.calls[0][0];
+    expect(sent).toMatchObject({ type: "phone_otp", target: "+12025550123" });
+    expect(sent.code).toMatch(/^\d{6}$/);
+    expect(vi.mocked(store.createWithPolicy).mock.calls[0][0].type).toBe("phone_otp");
+    expect(vi.mocked(store.createWithPolicy).mock.calls[0][0].target).toBe("+12025550123");
+  });
+
   it("consumes a valid OTP and marks the email verified", async () => {
     const store = createStore();
     const sender = createSender();
@@ -63,6 +79,27 @@ describe("VerificationService", () => {
     expect(store.consume).toHaveBeenCalledTimes(1);
     expect(store.markVerified).toHaveBeenCalledWith("user-1", "email_otp");
     expect(store.incrementAttempts).not.toHaveBeenCalled();
+  });
+
+  it("consumes a valid OTP and marks the phone verified", async () => {
+    const store = createStore();
+    const sender = createSender();
+    vi.mocked(store.findActive).mockResolvedValue({
+      id: "challenge-1",
+      userId: "user-1",
+      type: "phone_otp",
+      target: "+12025550123",
+      codeHash: sha256("123456"),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      attempts: 0,
+    });
+    const service = new VerificationService({ store, sender });
+
+    await service.verifyOtp("challenge-1", "123456");
+
+    expect(store.consume).toHaveBeenCalledTimes(1);
+    expect(store.markVerified).toHaveBeenCalledWith("user-1", "phone_otp");
   });
 
   it("increments attempts for an invalid OTP", async () => {
