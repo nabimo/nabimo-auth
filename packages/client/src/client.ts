@@ -13,7 +13,7 @@ import {
   type VerificationChallengeResult,
   type VerificationResult,
 } from "./types.js";
-import type { AuthErrorResponse, PasswordLoginRequest, PasswordResetConfirmRequest, PasswordResetRequest, RefreshRequest, RegisterRequest } from "@nabimo-auth/protocol";
+import type { AuthErrorResponse, PasswordLoginRequest, PasswordResetConfirmRequest, PasswordResetRequest, PhoneVerificationRequest, RefreshRequest, RegisterRequest } from "@nabimo-auth/protocol";
 
 const JSON_CONTENT_TYPE = "application/json";
 
@@ -49,6 +49,7 @@ export class AuthClient {
   }
 
   async requestEmailVerification(email: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/email/request", { email }, true); }
+  async requestPhoneVerification(phone: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/phone/request", { phone } satisfies PhoneVerificationRequest, true); }
   async verifyOtp(challengeId: string, code: string): Promise<VerificationResult> { return this.post<VerificationResult>("/auth/verify/otp", { challengeId, code }); }
   async requestPasswordReset(email: string): Promise<PasswordResetRequestResult> { return this.post<PasswordResetRequestResult>("/auth/password/reset/request", { email } satisfies PasswordResetRequest); }
   async confirmPasswordReset(token: string, newPassword: string): Promise<PasswordResetConfirmResult> { return this.post<PasswordResetConfirmResult>("/auth/password/reset/confirm", { token, newPassword } satisfies PasswordResetConfirmRequest); }
