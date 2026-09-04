@@ -48,13 +48,10 @@ export class RefreshService {
     const stored = await this.config.refreshTokens.getRefreshToken(tokenHash);
     if (!stored) throw authErrors.invalidCredentials();
 
-    if (
-      stored.usedAt ||
-      stored.revokedAt ||
-      stored.sessionRevokedAt ||
-      stored.expiresAt <= now ||
-      stored.sessionExpiresAt <= now
-    ) {
+    // Do not reject used tokens here. The persistence layer must receive them
+    // so it can atomically detect reuse and revoke the entire token family.
+    // This is security-critical: rejecting here would bypass reuse detection.
+    if (stored.revokedAt || stored.sessionRevokedAt || stored.expiresAt <= now || stored.sessionExpiresAt <= now) {
       throw authErrors.invalidCredentials();
     }
 
