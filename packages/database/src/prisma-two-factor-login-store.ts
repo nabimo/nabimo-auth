@@ -12,7 +12,7 @@ export class PrismaTwoFactorLoginStore implements TwoFactorLoginStore {
 
   async find(input: Parameters<TwoFactorLoginStore["find"]>[0]): Promise<{ userId: string } | null> {
     const record = await this.db.verification.findFirst({
-      where: { tokenHash: input.tokenHash, type: "TWO_FACTOR_LOGIN", consumedAt: null, expiresAt: { gt: input.now }, attempts: { lt: 5 } },
+      where: { tokenHash: input.tokenHash, type: "TWO_FACTOR_LOGIN", consumedAt: null, expiresAt: { gt: input.now } },
       select: { userId: true },
     });
     return record?.userId ? { userId: record.userId } : null;
@@ -20,7 +20,7 @@ export class PrismaTwoFactorLoginStore implements TwoFactorLoginStore {
 
   async incrementAttempts(input: Parameters<TwoFactorLoginStore["incrementAttempts"]>[0]): Promise<boolean> {
     const result = await this.db.verification.updateMany({
-      where: { tokenHash: input.tokenHash, type: "TWO_FACTOR_LOGIN", consumedAt: null, expiresAt: { gt: input.now }, attempts: { lt: 5 } },
+      where: { tokenHash: input.tokenHash, type: "TWO_FACTOR_LOGIN", consumedAt: null, expiresAt: { gt: input.now }, attempts: { lt: input.maxAttempts } },
       data: { attempts: { increment: 1 } },
     });
     return result.count === 1;
