@@ -3,7 +3,7 @@ import { authErrors } from "../auth/errors.js";
 import { createAccessTokenClaims, DEFAULT_ACCESS_TOKEN_POLICY } from "../auth/token-policy.js";
 import { signAccessToken } from "../crypto/jwt.js";
 import { createRefreshToken, hashRefreshToken } from "./refresh-token.js";
-import { DEFAULT_SESSION_POLICY } from "./service.js";
+import { DEFAULT_SESSION_POLICY, type SessionPolicy } from "./service.js";
 
 export interface RefreshTokenStore {
   getRefreshToken(tokenHash: string): Promise<{
@@ -34,6 +34,7 @@ export interface RefreshServiceConfig {
   jwtKeyId: string;
   issuer?: string;
   audience?: string;
+  sessionPolicy?: SessionPolicy;
 }
 
 export class RefreshService {
@@ -68,6 +69,7 @@ export class RefreshService {
 
     if (!rotated) throw authErrors.invalidCredentials();
 
+    const sessionPolicy = this.config.sessionPolicy ?? DEFAULT_SESSION_POLICY;
     const claims = createAccessTokenClaims(
       stored.userId,
       stored.sessionId,
@@ -76,7 +78,7 @@ export class RefreshService {
       {
         issuer: this.config.issuer ?? DEFAULT_ACCESS_TOKEN_POLICY.issuer,
         audience: this.config.audience ?? DEFAULT_ACCESS_TOKEN_POLICY.audience,
-        ttlSeconds: DEFAULT_SESSION_POLICY.accessTokenTtlSeconds,
+        ttlSeconds: sessionPolicy.accessTokenTtlSeconds,
       },
     );
 
