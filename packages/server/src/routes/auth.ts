@@ -3,6 +3,7 @@ import {
   AccessTokenValidationService,
   AuthError,
   AuthService,
+  normalizePhone,
   PasswordResetService,
   RefreshService,
   SessionManagementService,
@@ -85,9 +86,15 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
     const { claims } = await accessTokens.validate(token);
     const body = await readBody<{ phone?: unknown }>(event);
     if (typeof body?.phone !== "string") throw httpError(400, "INVALID_REQUEST", "Phone is required");
+    let phone: string;
+    try {
+      phone = normalizePhone(body.phone);
+    } catch {
+      throw httpError(400, "INVALID_REQUEST", "Invalid phone number");
+    }
     const user = await users.findById(claims.sub);
-    if (!user?.phone || user.phone !== body.phone.trim()) throw httpError(400, "INVALID_REQUEST", "Phone does not belong to the authenticated user");
-    const challenge = await verification.requestPhoneOtp(user.id, user.phone);
+    if (!user?.phone || user.phone !== phone) throw httpError(400, "INVALID_REQUEST", "Phone does not belong to the authenticated user");
+    const challenge = await verification.requestPhoneOtp(user.id, phone);
     return { challengeId: challenge.challengeId, type: challenge.type, target: challenge.target, expiresAt: challenge.expiresAt.toISOString() };
   })));
 
