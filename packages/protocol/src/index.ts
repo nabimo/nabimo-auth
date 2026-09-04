@@ -26,6 +26,14 @@ export interface PasswordResetConfirmRequest { token: string; newPassword: strin
 export interface PasswordResetRequestResponse { success: true; }
 export interface PasswordResetConfirmResponse { success: true; }
 
+export interface TwoFactorSetupResponse {
+  secret: string;
+  otpauthUri: string;
+  recoveryCodes: string[];
+}
+export interface TwoFactorCodeRequest { code: string; }
+export interface TwoFactorSuccessResponse { success: true; }
+
 export interface RegisterRequest { email: string; password: string; }
 export interface PasswordLoginRequest { email: string; password: string; }
 export interface RefreshRequest { refreshToken: string; }
@@ -64,4 +72,7 @@ export const AUTH_ENDPOINTS = {
   verifyOtp: "POST /auth/verify/otp",
   requestPasswordReset: "POST /auth/password/reset/request",
   confirmPasswordReset: "POST /auth/password/reset/confirm",
+  setupTwoFactor: "POST /auth/2fa/setup",
+  enableTwoFactor: "POST /auth/2fa/enable",
+  disableTwoFactor: "POST /auth/2fa/disable",
 } as const;
