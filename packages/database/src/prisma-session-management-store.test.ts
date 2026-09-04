@@ -5,11 +5,10 @@ type MockSession = { id: string; userId: string; revokedAt: Date | null };
 type MockTx = {
   session: {
     findUnique(args: { where: { id: string } }): Promise<MockSession | null>;
-    findMany(args: { where: { userId: string; revokedAt: null }; select: { id: boolean } }): Promise<{ id: string }[]>;
     updateMany(args: { where: { id?: string; userId?: string; revokedAt: null }; data: { revokedAt: Date } }): Promise<{ count: number }>;
   };
   refreshToken: {
-    updateMany(args: { where: { sessionId?: string | { in: string[] }; userId?: string; revokedAt: null }; data: { revokedAt: Date } }): Promise<{ count: number }>;
+    updateMany(args: { where: { sessionId?: string; userId?: string; revokedAt: null }; data: { revokedAt: Date } }): Promise<{ count: number }>;
   };
 };
 
@@ -23,7 +22,6 @@ function createDbMock() {
   const tx: MockTx = {
     session: {
       async findUnique({ where }) { return sessions.find((s) => s.id === where.id) ?? null; },
-      async findMany({ where }) { calls.push(`findMany:${where.userId}`); return sessions.filter((s) => s.userId === where.userId && s.revokedAt === null).map(({ id }) => ({ id })); },
       async updateMany({ where, data }) {
         const matches = sessions.filter((s) => (where.id === undefined || s.id === where.id) && (where.userId === undefined || s.userId === where.userId) && s.revokedAt === null);
         for (const session of matches) session.revokedAt = data.revokedAt;
@@ -32,7 +30,7 @@ function createDbMock() {
     },
     refreshToken: {
       async updateMany({ where }) {
-        calls.push(typeof where.sessionId === "object" ? `token-update:sessions:${where.sessionId.in.join(",")}` : `token-update:${where.sessionId ?? `user:${where.userId}`}`);
+        calls.push(`token-update:${where.sessionId ?? `user:${where.userId}`}`);
         return { count: 1 };
       },
     },
@@ -60,13 +58,13 @@ describe("PrismaSessionManagementStore", () => {
     expect(calls).toEqual(["session-update:0"]);
   });
 
-  it("revokes all active sessions and only their refresh tokens", async () => {
+  it("revokes all active sessions and every active refresh token for the user", async () => {
     const { db, calls, sessions } = createDbMock();
     const store = new PrismaSessionManagementStore(db as never);
     const now = new Date("2026-09-02T00:00:00.000Z");
     await expect(store.revokeAllSessions("user-1", now)).resolves.toBe(2);
     expect(sessions.filter((s) => s.revokedAt === now).map((s) => s.id)).toEqual(["session-1", "session-2"]);
     expect(sessions.find((s) => s.id === "session-3")?.revokedAt).toBeNull();
-    expect(calls).toEqual(["findMany:user-1", "session-update:2", "token-update:sessions:session-1,session-2"]);
+    expect(calls).toEqual(["session-update:2", "token-update:user:user-1"]);
   });
 });
