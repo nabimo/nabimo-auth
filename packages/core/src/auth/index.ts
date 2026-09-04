@@ -9,3 +9,4 @@ export * from "./verification.js";
 export * from "./password-reset.js";
 export * from "./two-factor.js";
 export * from "./two-factor-login.js";
+export * from "./rate-limit.js";
