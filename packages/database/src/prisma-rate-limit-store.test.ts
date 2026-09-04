@@ -8,19 +8,33 @@ interface Bucket {
   count: number;
 }
 
-function createDbMock() {
+interface DbMock {
+  $transaction<T>(callback: (tx: DbMock) => Promise<T>): Promise<T>;
+  $executeRaw(): Promise<number>;
+  rateLimitBucket: {
+    deleteMany(args: { where: { key: string; windowStartedAt: { lt: Date } } }): Promise<{ count: number }>;
+    upsert(args: {
+      where: { key_windowStartedAt: { key: string; windowStartedAt: Date } };
+      create: { id: string; key: string; windowStartedAt: Date; count: number };
+      update: Record<string, never>;
+    }): Promise<Bucket>;
+    update(args: { where: { id: string }; data: { count: { increment: number } } }): Promise<Bucket>;
+  };
+}
+
+function createDbMock(): DbMock {
   const buckets = new Map<string, Bucket>();
   let nextId = 0;
 
-  const db = {
-    async $transaction<T>(callback: (tx: typeof db) => Promise<T>): Promise<T> {
+  const db: DbMock = {
+    async $transaction<T>(callback) {
       return callback(db);
     },
     async $executeRaw() {
       return 1;
     },
     rateLimitBucket: {
-      async deleteMany(args: { where: { key: string; windowStartedAt: { lt: Date } } }) {
+      async deleteMany(args) {
         for (const [id, bucket] of buckets) {
           if (bucket.key === args.where.key && bucket.windowStartedAt < args.where.windowStartedAt.lt) {
             buckets.delete(id);
@@ -28,11 +42,7 @@ function createDbMock() {
         }
         return { count: 0 };
       },
-      async upsert(args: {
-        where: { key_windowStartedAt: { key: string; windowStartedAt: Date } };
-        create: { id: string; key: string; windowStartedAt: Date; count: number };
-        update: Record<string, never>;
-      }) {
+      async upsert(args) {
         const { key, windowStartedAt } = args.where.key_windowStartedAt;
         const bucketKey = `${key}:${windowStartedAt.toISOString()}`;
         const existing = buckets.get(bucketKey);
@@ -41,7 +51,7 @@ function createDbMock() {
         buckets.set(bucketKey, bucket);
         return bucket;
       },
-      async update(args: { where: { id: string }; data: { count: { increment: number } } }) {
+      async update(args) {
         const bucket = [...buckets.values()].find((value) => value.id === args.where.id);
         if (!bucket) throw new Error("Bucket not found");
         bucket.count += args.data.count.increment;
