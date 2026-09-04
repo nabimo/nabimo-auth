@@ -3,7 +3,7 @@ import { authErrors } from "./errors.js";
 import { createAccessTokenClaims, DEFAULT_ACCESS_TOKEN_POLICY } from "./token-policy.js";
 import { createPasswordHash, verifyUserPassword } from "./password.js";
 import { normalizeEmail } from "./credentials.js";
-import { createSession, DEFAULT_SESSION_POLICY } from "../session/service.js";
+import { createSession, DEFAULT_SESSION_POLICY, type SessionPolicy } from "../session/service.js";
 import { signAccessToken } from "../crypto/jwt.js";
 import type { TwoFactorLoginService } from "./two-factor-login.js";
 import { DEFAULT_PASSWORD_LOGIN_RATE_LIMIT_POLICY, RateLimiter, type RateLimitPolicy } from "./rate-limit.js";
@@ -14,7 +14,7 @@ export interface RegistrationTransactionStore {
 
 export interface AuthUserStore {
   findByEmail(email: string): Promise<{ id: string; email: string | null; passwordCredential: { passwordHash: string } | null } | null>;
-  findById(id: string): Promise<{ id: string; email: string | null } | null>;
+  findById(id: string): Promise<{ id: string; email: string | null }>;
 }
 
 export interface SessionStore {
@@ -29,6 +29,7 @@ export interface AuthServiceConfig {
   jwtKeyId: string;
   issuer?: string;
   audience?: string;
+  sessionPolicy?: SessionPolicy;
   twoFactorLogin?: TwoFactorLoginService;
   loginRateLimiter?: RateLimiter;
   loginRateLimitPolicy?: RateLimitPolicy;
@@ -49,7 +50,7 @@ export class AuthService {
     const existing = await this.config.users.findByEmail(email);
     if (existing) throw authErrors.accountAlreadyExists();
     const passwordHash = await createPasswordHash(password);
-    const session = createSession();
+    const session = createSession(Date.now(), this.config.sessionPolicy ?? DEFAULT_SESSION_POLICY);
     const user = await this.config.registration.registerUser({ email, passwordHash, sessionId: session.sessionId, familyId: session.familyId, refreshTokenHash: session.refreshTokenHash, sessionExpiresAt: session.expiresAt });
     return this.createAuthenticationResult(user.id, user.email ?? email, session);
   }
@@ -95,16 +96,17 @@ export class AuthService {
   }
 
   private async createSessionResult(userId: string, email: string) {
-    const session = createSession();
+    const session = createSession(Date.now(), this.config.sessionPolicy ?? DEFAULT_SESSION_POLICY);
     await this.config.sessions.create({ id: session.sessionId, userId, familyId: session.familyId, expiresAt: session.expiresAt, refreshTokenHash: session.refreshTokenHash });
     return this.createAuthenticationResult(userId, email, session);
   }
 
   private createAuthenticationResult(userId: string, email: string, session: ReturnType<typeof createSession>) {
+    const sessionPolicy = this.config.sessionPolicy ?? DEFAULT_SESSION_POLICY;
     const claims = createAccessTokenClaims(userId, session.sessionId, randomUUID(), Math.floor(Date.now() / 1000), {
       issuer: this.config.issuer ?? DEFAULT_ACCESS_TOKEN_POLICY.issuer,
       audience: this.config.audience ?? DEFAULT_ACCESS_TOKEN_POLICY.audience,
-      ttlSeconds: DEFAULT_SESSION_POLICY.accessTokenTtlSeconds,
+      ttlSeconds: sessionPolicy.accessTokenTtlSeconds,
     });
     return { user: { id: userId, email }, sessionId: session.sessionId, accessToken: signAccessToken(claims, this.config.jwtPrivateKeyPem, this.config.jwtKeyId), refreshToken: session.refreshToken };
   }
