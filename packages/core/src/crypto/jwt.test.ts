@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { describe, expect, it } from "vitest";
 import { generateJwtKeyPair, signAccessToken, verifyAccessToken, type AccessTokenClaims } from "./jwt.js";
 
 describe("JWT access token validation", () => {
