@@ -67,9 +67,16 @@ export function verifyAccessToken(
       typeof payload.iss !== "string" || !payload.iss ||
       typeof payload.aud !== "string" || !payload.aud
     ) return null;
-    if (!Number.isSafeInteger(payload.exp) || !Number.isSafeInteger(payload.iat)) return null;
-    if (payload.exp <= now || payload.exp <= payload.iat) return null;
-    if (payload.iat > now + MAX_CLOCK_SKEW_SECONDS) return null;
+    if (
+      typeof payload.exp !== "number" ||
+      typeof payload.iat !== "number" ||
+      !Number.isSafeInteger(payload.exp) ||
+      !Number.isSafeInteger(payload.iat)
+    ) return null;
+
+    const { exp, iat } = payload;
+    if (exp <= now || exp <= iat) return null;
+    if (iat > now + MAX_CLOCK_SKEW_SECONDS) return null;
 
     return payload as AccessTokenClaims;
   } catch {
