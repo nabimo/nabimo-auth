@@ -41,7 +41,7 @@ export class PrismaPasswordResetStore implements PasswordResetStore {
     });
   }
 
-  async consumeAndSetPassword(input: Parameters<PasswordResetStore["consumeAndSetPassword"]>[0]): Promise<string | null> {
+  async consumeAndSetPassword(input: Parameters<PasswordResetStore["consumeAndSetPassword"]>[0]): Promise<boolean> {
     return this.db.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`password_reset_token:${input.tokenHash}`}))`;
       const record = await tx.verification.findFirst({
@@ -53,20 +53,37 @@ export class PrismaPasswordResetStore implements PasswordResetStore {
         },
         select: { id: true, userId: true },
       });
-      if (!record?.userId) return null;
+      if (!record?.userId) return false;
 
       const consumed = await tx.verification.updateMany({
         where: { id: record.id, consumedAt: null, expiresAt: { gt: input.now } },
         data: { consumedAt: input.now },
       });
-      if (consumed.count !== 1) return null;
+      if (consumed.count !== 1) return false;
 
       await tx.passwordCredential.upsert({
         where: { userId: record.userId },
         create: { userId: record.userId, passwordHash: input.passwordHash },
         update: { passwordHash: input.passwordHash },
       });
-      return record.userId;
+
+      const sessions = await tx.session.findMany({
+        where: { userId: record.userId, revokedAt: null },
+        select: { id: true },
+      });
+      const sessionIds = sessions.map((session) => session.id);
+      if (sessionIds.length > 0) {
+        await tx.session.updateMany({
+          where: { id: { in: sessionIds }, revokedAt: null },
+          data: { revokedAt: input.now },
+        });
+        await tx.refreshToken.updateMany({
+          where: { sessionId: { in: sessionIds }, revokedAt: null },
+          data: { revokedAt: input.now },
+        });
+      }
+
+      return true;
     });
   }
 }
