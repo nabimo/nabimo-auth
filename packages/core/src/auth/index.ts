@@ -7,3 +7,4 @@ export * from "./service-contracts.js";
 export * from "./service.js";
 export * from "./verification.js";
 export * from "./password-reset.js";
+export * from "./two-factor.js";
