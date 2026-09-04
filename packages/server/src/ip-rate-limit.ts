@@ -19,11 +19,21 @@ function normalizeIp(value: string): string {
   return trimmed.startsWith("::ffff:") ? trimmed.slice(7) : trimmed;
 }
 
-function isTrustedProxy(ip: string, trustedProxyIps: readonly string[]): boolean {
-  const normalized = normalizeIp(ip);
-  return isIP(normalized) !== 0 && trustedProxyIps.some((trusted) => normalizeIp(trusted) === normalized);
+function isValidIp(value: string): boolean {
+  return isIP(normalizeIp(value)) !== 0;
 }
 
+function isTrustedProxy(ip: string, trustedProxyIps: readonly string[]): boolean {
+  const normalized = normalizeIp(ip);
+  return isValidIp(normalized) && trustedProxyIps.some((trusted) => normalizeIp(trusted) === normalized);
+}
+
+/**
+ * Resolve the client IP without trusting forwarded headers unless the
+ * immediate peer is explicitly listed as a trusted proxy. Trusted proxy
+ * addresses are matched exactly; CIDR ranges are intentionally unsupported
+ * until they can be implemented and tested without weakening this boundary.
+ */
 export function resolveClientIp(event: H3Event, trustedProxyIps: readonly string[] = []): string | undefined {
   const peer = event.node.req.socket.remoteAddress;
   if (!peer) return undefined;
@@ -33,12 +43,14 @@ export function resolveClientIp(event: H3Event, trustedProxyIps: readonly string
 
   const forwarded = event.node.req.headers["x-forwarded-for"];
   const values = Array.isArray(forwarded) ? forwarded : forwarded ? forwarded.split(",") : [];
-  for (let index = values.length - 1; index >= 0; index -= 1) {
-    const candidate = normalizeIp(values[index]);
-    if (isIP(candidate) !== 0) return candidate;
+  const validValues = values.map(normalizeIp).filter(isValidIp);
+
+  for (let index = validValues.length - 1; index >= 0; index -= 1) {
+    const candidate = validValues[index];
+    if (!isTrustedProxy(candidate, trustedProxyIps)) return candidate;
   }
 
-  return normalizedPeer;
+  return validValues[0] ?? normalizedPeer;
 }
 
 function routeKey(event: H3Event): string | undefined {
