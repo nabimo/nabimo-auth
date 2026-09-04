@@ -1,3 +1,5 @@
+import { authErrors } from "./errors.js";
+
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
@@ -21,8 +23,9 @@ export interface RateLimitPolicy {
 export class RateLimiter {
   constructor(private readonly store: RateLimitStore) {}
 
-  async check(key: string, policy: RateLimitPolicy, now = new Date()): Promise<void> {
+  async check(key: string, policy: RateLimitPolicy, now = new Date()): Promise<RateLimitResult> {
     const result = await this.store.consume({ key, ...policy, now });
-    if (!result.allowed) throw new Error(`Rate limit exceeded; retry after ${result.retryAfterSeconds}s`);
+    if (!result.allowed) throw authErrors.rateLimited(result.retryAfterSeconds);
+    return result;
   }
 }
