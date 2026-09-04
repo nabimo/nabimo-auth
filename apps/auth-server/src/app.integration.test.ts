@@ -8,7 +8,7 @@ let baseUrl: string;
 let db: { $executeRawUnsafe: (query: string) => Promise<unknown>; $disconnect: () => Promise<void> };
 
 function generatePrivateKeyPem(): string {
-  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const { privateKey } = generateKeyPairSync("ed25519");
   return privateKey.export({ type: "pkcs8", format: "pem" }).toString();
 }
 
