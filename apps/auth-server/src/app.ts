@@ -1,8 +1,8 @@
 import { createApp, eventHandler, toNodeListener } from "h3";
 import { createServer } from "node:http";
 import { createPublicKey } from "node:crypto";
-import { AuthService, AccessTokenValidationService, PasswordResetService, RefreshService, SessionManagementService, TwoFactorService, VerificationService } from "@nabimo-auth/core";
-import { getDatabaseClient, UserRepository, PrismaSessionStore, PrismaRegistrationTransactionStore, PrismaSessionManagementStore, PrismaRefreshTokenStore, PrismaVerificationStore, PrismaPasswordResetStore, PrismaTwoFactorStore } from "@nabimo-auth/database";
+import { AuthService, AccessTokenValidationService, PasswordResetService, RefreshService, SessionManagementService, TwoFactorService, TwoFactorLoginService, VerificationService } from "@nabimo-auth/core";
+import { getDatabaseClient, UserRepository, PrismaSessionStore, PrismaRegistrationTransactionStore, PrismaSessionManagementStore, PrismaRefreshTokenStore, PrismaVerificationStore, PrismaPasswordResetStore, PrismaTwoFactorStore, PrismaTwoFactorLoginStore } from "@nabimo-auth/database";
 import { createAuthRouter } from "@nabimo-auth/server";
 import { loadConfig } from "./config.js";
 import { ConsoleVerificationCodeSender } from "./verification-sender.js";
@@ -23,15 +23,16 @@ export function createAuthApp() {
   const sessionManagement = new SessionManagementService(sessionManagementStore);
   const passwordReset = new PasswordResetService({ store: passwordResetStore, sender: new ConsolePasswordResetSender(), findUserByEmail: async (email) => users.findByEmail(email), revokeAllSessions: (userId) => sessionManagement.revokeAllSessions(userId) });
   const twoFactor = new TwoFactorService({ store: new PrismaTwoFactorStore(db), cipher: new AesTwoFactorSecretCipher(config.twoFactorEncryptionKey), issuer: config.issuer });
+  const twoFactorLogin = new TwoFactorLoginService({ store: new PrismaTwoFactorLoginStore(db), twoFactor });
   const publicKeyPem = createPublicKey(config.jwtPrivateKeyPem).export({ type: "spki", format: "pem" }).toString();
 
-  const auth = new AuthService({ users, sessions, registration, jwtPrivateKeyPem: config.jwtPrivateKeyPem, jwtKeyId: config.jwtKeyId, issuer: config.issuer, audience: config.audience });
+  const auth = new AuthService({ users, sessions, registration, jwtPrivateKeyPem: config.jwtPrivateKeyPem, jwtKeyId: config.jwtKeyId, issuer: config.issuer, audience: config.audience, twoFactorLogin });
   const refresh = new RefreshService({ refreshTokens: refreshTokenStore, jwtPrivateKeyPem: config.jwtPrivateKeyPem, jwtKeyId: config.jwtKeyId, issuer: config.issuer, audience: config.audience });
   const accessTokens = new AccessTokenValidationService({ publicKeyPem, sessions: sessionManagementStore, issuer: config.issuer, audience: config.audience });
 
   const app = createApp();
   app.use("/health", eventHandler(() => ({ status: "ok" })));
-  app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, twoFactor, users }).handler);
+  app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, twoFactor, twoFactorLogin, users }).handler);
   return { app, db };
 }
 
