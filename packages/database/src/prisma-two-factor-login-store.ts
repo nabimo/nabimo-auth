@@ -1,3 +1,4 @@
+import { authErrors } from "@nabimo-auth/core";
 import type { TwoFactorLoginStore } from "@nabimo-auth/core";
 import type { PrismaClient } from "./generated/client.js";
 
@@ -5,8 +6,21 @@ export class PrismaTwoFactorLoginStore implements TwoFactorLoginStore {
   constructor(private readonly db: PrismaClient) {}
 
   async create(input: Parameters<TwoFactorLoginStore["create"]>[0]): Promise<void> {
-    await this.db.verification.create({
-      data: { id: input.id, userId: input.userId, type: "TWO_FACTOR_LOGIN", target: input.userId, tokenHash: input.tokenHash, expiresAt: input.expiresAt },
+    await this.db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`two_factor_login:${input.userId}`}))`;
+      const active = await tx.verification.count({
+        where: {
+          userId: input.userId,
+          type: "TWO_FACTOR_LOGIN",
+          consumedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+      });
+      if (active >= input.maxActiveChallenges) throw authErrors.otpRateLimited();
+
+      await tx.verification.create({
+        data: { id: input.id, userId: input.userId, type: "TWO_FACTOR_LOGIN", target: input.userId, tokenHash: input.tokenHash, expiresAt: input.expiresAt },
+      });
     });
   }
 
