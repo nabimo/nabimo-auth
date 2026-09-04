@@ -13,6 +13,7 @@ export * from "./prisma-verification-store.js";
 export * from "./prisma-password-reset-store.js";
 export * from "./prisma-two-factor-store.js";
 export * from "./prisma-two-factor-login-store.js";
+export * from "./prisma-rate-limit-store.js";
 
 let client: PrismaClient | undefined;
 
