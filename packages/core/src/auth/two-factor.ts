@@ -11,8 +11,9 @@ export interface TwoFactorStore {
   disable(userId: string): Promise<boolean>;
   consumeRecoveryCode(userId: string, codeHash: string, now: Date): Promise<boolean>;
 }
+export interface TwoFactorSessionInvalidator { revokeAllSessions(userId: string, now?: Date): Promise<number>; }
 export interface TwoFactorSecretCipher { encrypt(secret: string): string; decrypt(ciphertext: string): string; }
-export interface TwoFactorServiceConfig { store: TwoFactorStore; cipher: TwoFactorSecretCipher; issuer?: string; }
+export interface TwoFactorServiceConfig { store: TwoFactorStore; cipher: TwoFactorSecretCipher; sessions?: TwoFactorSessionInvalidator; issuer?: string; }
 export interface TwoFactorSetupResult { secret: string; otpauthUri: string; recoveryCodes: string[]; }
 
 const RECOVERY_CODE_COUNT = 10;
@@ -55,7 +56,9 @@ export class TwoFactorService {
   }
 
   async disable(userId: string): Promise<void> {
+    const disabledAt = new Date();
     if (!await this.config.store.disable(userId)) throw authErrors.invalidTwoFactorCode();
+    if (this.config.sessions) await this.config.sessions.revokeAllSessions(userId, disabledAt);
   }
 
   private generateRecoveryCode(): string {
