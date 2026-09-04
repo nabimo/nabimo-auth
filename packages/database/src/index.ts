@@ -12,6 +12,7 @@ export * from "./prisma-session-management-store.js";
 export * from "./prisma-verification-store.js";
 export * from "./prisma-password-reset-store.js";
 export * from "./prisma-two-factor-store.js";
+export * from "./prisma-two-factor-login-store.js";
 
 let client: PrismaClient | undefined;
 
