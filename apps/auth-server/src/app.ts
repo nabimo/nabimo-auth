@@ -22,7 +22,7 @@ export function createAuthApp() {
   const passwordResetStore = new PrismaPasswordResetStore(db);
   const sessionManagement = new SessionManagementService(sessionManagementStore);
   const passwordReset = new PasswordResetService({ store: passwordResetStore, sender: new ConsolePasswordResetSender(), findUserByEmail: async (email) => users.findByEmail(email) });
-  const twoFactor = new TwoFactorService({ store: new PrismaTwoFactorStore(db), cipher: new AesTwoFactorSecretCipher(config.twoFactorEncryptionKey), issuer: config.issuer });
+  const twoFactor = new TwoFactorService({ store: new PrismaTwoFactorStore(db), cipher: new AesTwoFactorSecretCipher(config.twoFactorEncryptionKey), sessions: sessionManagement, issuer: config.issuer });
   const twoFactorLogin = new TwoFactorLoginService({ store: new PrismaTwoFactorLoginStore(db), twoFactor });
   const publicKeyPem = createPublicKey(config.jwtPrivateKeyPem).export({ type: "spki", format: "pem" }).toString();
 
