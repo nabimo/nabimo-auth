@@ -12,7 +12,8 @@ export interface TwoFactorLoginChallenge {
 
 export interface TwoFactorLoginStore {
   create(input: { id: string; userId: string; tokenHash: string; expiresAt: Date }): Promise<void>;
-  consume(input: { tokenHash: string; now: Date }): Promise<string | null>;
+  find(input: { tokenHash: string; now: Date }): Promise<{ userId: string } | null>;
+  consume(input: { tokenHash: string; now: Date }): Promise<boolean>;
 }
 
 export interface TwoFactorLoginServiceConfig {
@@ -29,10 +30,7 @@ export class TwoFactorLoginService {
   }
 
   async createChallenge(userId: string): Promise<TwoFactorLoginChallenge> {
-    if (!await this.config.twoFactor.isEnabled(userId)) {
-      throw authErrors.invalidTwoFactorCode();
-    }
-
+    if (!await this.config.twoFactor.isEnabled(userId)) throw authErrors.invalidTwoFactorCode();
     const { token, hash } = generateToken(32);
     const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
     await this.config.store.create({ id: randomUUID(), userId, tokenHash: hash, expiresAt });
@@ -40,19 +38,12 @@ export class TwoFactorLoginService {
   }
 
   async verifyChallenge(challengeToken: string, code: string): Promise<string> {
-    if (typeof challengeToken !== "string" || challengeToken.length < 32 || !/^\d{6}$/.test(code)) {
-      throw authErrors.invalidTwoFactorCode();
-    }
-
-    const userId = await this.config.store.consume({ tokenHash: sha256(challengeToken), now: new Date() });
-    if (!userId) throw authErrors.invalidTwoFactorCode();
-
-    try {
-      await this.config.twoFactor.verify(userId, code);
-    } catch (error) {
-      throw error;
-    }
-
-    return userId;
+    if (typeof challengeToken !== "string" || challengeToken.length < 32 || !/^\d{6}$/.test(code)) throw authErrors.invalidTwoFactorCode();
+    const tokenHash = sha256(challengeToken);
+    const challenge = await this.config.store.find({ tokenHash, now: new Date() });
+    if (!challenge) throw authErrors.invalidTwoFactorCode();
+    await this.config.twoFactor.verify(challenge.userId, code);
+    if (!await this.config.store.consume({ tokenHash, now: new Date() })) throw authErrors.invalidTwoFactorCode();
+    return challenge.userId;
   }
 }
