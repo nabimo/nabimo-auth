@@ -13,17 +13,15 @@ export interface TwoFactorLoginStore {
 }
 export interface TwoFactorLoginServiceConfig {
   store: TwoFactorLoginStore;
-  twoFactor: Pick<TwoFactorService, "verify" | "isEnabled">;
+  twoFactor: Pick<TwoFactorService, "verify" | "verifyRecoveryCode" | "isEnabled">;
   ttlSeconds?: number;
   maxAttempts?: number;
 }
 
 export class TwoFactorLoginService {
   private readonly ttlSeconds: number;
-  private readonly maxAttempts: number;
   constructor(private readonly config: TwoFactorLoginServiceConfig) {
     this.ttlSeconds = config.ttlSeconds ?? 5 * 60;
-    this.maxAttempts = config.maxAttempts ?? 5;
   }
   async configuredForUser(userId: string): Promise<boolean> { return this.config.twoFactor.isEnabled(userId); }
   async createChallenge(userId: string): Promise<TwoFactorLoginChallenge> {
@@ -34,13 +32,23 @@ export class TwoFactorLoginService {
     return { challengeToken: token, userId, expiresAt };
   }
   async verifyChallenge(challengeToken: string, code: string): Promise<string> {
-    if (typeof challengeToken !== "string" || challengeToken.length < 32 || !/^\d{6}$/.test(code)) throw authErrors.invalidTwoFactorCode();
+    if (typeof challengeToken !== "string" || challengeToken.length < 32 || typeof code !== "string" || code.length === 0) throw authErrors.invalidTwoFactorCode();
     const tokenHash = sha256(challengeToken);
     const now = new Date();
     const challenge = await this.config.store.find({ tokenHash, now });
     if (!challenge) throw authErrors.invalidTwoFactorCode();
     if (!await this.config.store.incrementAttempts({ tokenHash, now })) throw authErrors.invalidTwoFactorCode();
-    await this.config.twoFactor.verify(challenge.userId, code);
+
+    try {
+      await this.config.twoFactor.verify(challenge.userId, code);
+    } catch {
+      try {
+        await this.config.twoFactor.verifyRecoveryCode(challenge.userId, code);
+      } catch {
+        throw authErrors.invalidTwoFactorCode();
+      }
+    }
+
     if (!await this.config.store.consume({ tokenHash, now: new Date() })) throw authErrors.invalidTwoFactorCode();
     return challenge.userId;
   }
