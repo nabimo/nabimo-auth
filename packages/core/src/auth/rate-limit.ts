@@ -20,6 +20,11 @@ export interface RateLimitPolicy {
   windowSeconds: number;
 }
 
+export const DEFAULT_PASSWORD_LOGIN_RATE_LIMIT_POLICY: RateLimitPolicy = {
+  limit: 5,
+  windowSeconds: 60,
+};
+
 export class RateLimiter {
   constructor(private readonly store: RateLimitStore) {}
 
