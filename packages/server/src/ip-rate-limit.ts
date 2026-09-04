@@ -55,7 +55,11 @@ export function resolveClientIp(event: H3Event, trustedProxyIps: readonly string
 
 function routeKey(event: H3Event): string | undefined {
   if (event.node.req.method !== "POST") return undefined;
-  const path = event.path.startsWith("/auth/") ? event.path.slice("/auth".length) : event.path;
+
+  const rawUrl = event.node.req.url ?? event.path;
+  const pathname = new URL(rawUrl, "http://localhost").pathname;
+  const path = pathname.startsWith("/auth/") ? pathname.slice("/auth".length) : pathname;
+
   switch (path) {
     case "/register": return "register";
     case "/login/password": return "login-password";
