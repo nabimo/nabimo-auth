@@ -1,11 +1,10 @@
+import { randomUUID } from "node:crypto";
 import type { RateLimitResult, RateLimitStore } from "@nabimo-auth/core";
 import type { PrismaClient } from "./generated/client.js";
 
-const EPOCH_MS = 0;
-
 function getWindowStart(now: Date, windowSeconds: number): Date {
   const windowMs = windowSeconds * 1000;
-  return new Date(Math.floor((now.getTime() - EPOCH_MS) / windowMs) * windowMs);
+  return new Date(Math.floor(now.getTime() / windowMs) * windowMs);
 }
 
 export class PrismaRateLimitStore implements RateLimitStore {
@@ -41,7 +40,7 @@ export class PrismaRateLimitStore implements RateLimitStore {
           },
         },
         create: {
-          id: crypto.randomUUID(),
+          id: randomUUID(),
           key: input.key,
           windowStartedAt,
           count: 0,
