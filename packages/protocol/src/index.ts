@@ -30,6 +30,7 @@ export interface RegisterRequest { email: string; password: string; }
 export interface PasswordLoginRequest { email: string; password: string; }
 export interface RefreshRequest { refreshToken: string; }
 export interface EmailVerificationRequest { email: string; }
+export interface PhoneVerificationRequest { phone: string; }
 export interface VerifyOtpRequest { challengeId: string; code: string; }
 
 export type AuthErrorCode =
@@ -59,6 +60,7 @@ export const AUTH_ENDPOINTS = {
   logout: "POST /auth/logout",
   logoutAll: "POST /auth/logout-all",
   requestEmailVerification: "POST /auth/verify/email/request",
+  requestPhoneVerification: "POST /auth/verify/phone/request",
   verifyOtp: "POST /auth/verify/otp",
   requestPasswordReset: "POST /auth/password/reset/request",
   confirmPasswordReset: "POST /auth/password/reset/confirm",
