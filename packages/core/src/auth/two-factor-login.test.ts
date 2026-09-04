@@ -28,6 +28,19 @@ describe("TwoFactorLoginService", () => {
     expect(store.consume).toHaveBeenCalledTimes(1);
   });
 
+  it("passes the active challenge limit when creating a challenge", async () => {
+    const store = createStore();
+    const twoFactor = {
+      isEnabled: vi.fn().mockResolvedValue(true),
+      verify: vi.fn(),
+      verifyRecoveryCode: vi.fn(),
+    };
+    const service = new TwoFactorLoginService({ store, twoFactor, maxActiveChallenges: 2 });
+
+    await service.createChallenge("user-1");
+    expect(store.create).toHaveBeenCalledWith(expect.objectContaining({ userId: "user-1", maxActiveChallenges: 2 }));
+  });
+
   it("falls back to a recovery code when TOTP verification fails", async () => {
     const store = createStore();
     vi.mocked(store.find).mockResolvedValue({ userId: "user-1" });
@@ -53,7 +66,7 @@ describe("TwoFactorLoginService", () => {
     };
     const service = new TwoFactorLoginService({ store, twoFactor });
 
-    await expect(service.verifyChallenge("c".repeat(32), "BAD-CODE")).rejects.toMatchObject({ code: "INVALID_2FA_CODE" });
+    await expect(service.verifyChallenge("c".repeat(64), "BAD-CODE")).rejects.toMatchObject({ code: "INVALID_2FA_CODE" });
     expect(store.consume).not.toHaveBeenCalled();
   });
 
