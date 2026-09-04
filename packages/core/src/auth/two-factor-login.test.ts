@@ -22,6 +22,7 @@ describe("TwoFactorLoginService", () => {
     const service = new TwoFactorLoginService({ store, twoFactor });
 
     await expect(service.verifyChallenge("a".repeat(32), "123456")).resolves.toBe("user-1");
+    expect(store.incrementAttempts).toHaveBeenCalledWith(expect.objectContaining({ maxAttempts: 5 }));
     expect(twoFactor.verify).toHaveBeenCalledWith("user-1", "123456");
     expect(twoFactor.verifyRecoveryCode).not.toHaveBeenCalled();
     expect(store.consume).toHaveBeenCalledTimes(1);
@@ -54,5 +55,21 @@ describe("TwoFactorLoginService", () => {
 
     await expect(service.verifyChallenge("c".repeat(32), "BAD-CODE")).rejects.toMatchObject({ code: "INVALID_2FA_CODE" });
     expect(store.consume).not.toHaveBeenCalled();
+  });
+
+  it("passes a custom maximum attempt policy to the store", async () => {
+    const store = createStore();
+    vi.mocked(store.find).mockResolvedValue({ userId: "user-1" });
+    vi.mocked(store.incrementAttempts).mockResolvedValue(false);
+    const twoFactor = {
+      isEnabled: vi.fn().mockResolvedValue(true),
+      verify: vi.fn().mockResolvedValue(undefined),
+      verifyRecoveryCode: vi.fn(),
+    };
+    const service = new TwoFactorLoginService({ store, twoFactor, maxAttempts: 3 });
+
+    await expect(service.verifyChallenge("d".repeat(32), "123456")).rejects.toMatchObject({ code: "INVALID_2FA_CODE" });
+    expect(store.incrementAttempts).toHaveBeenCalledWith(expect.objectContaining({ maxAttempts: 3 }));
+    expect(twoFactor.verify).not.toHaveBeenCalled();
   });
 });
