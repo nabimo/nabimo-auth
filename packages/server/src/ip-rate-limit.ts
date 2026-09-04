@@ -15,22 +15,15 @@ export interface IpRateLimitOptions {
 }
 
 function normalizeIp(value: string): string {
-  const trimmed = value.trim();
-  if (trimmed.startsWith("::ffff:")) return trimmed.slice(7);
-  return trimmed;
+  const trimmed = value.trim().replace(/^\[|\]$/g, "");
+  return trimmed.startsWith("::ffff:") ? trimmed.slice(7) : trimmed;
 }
 
 function isTrustedProxy(ip: string, trustedProxyIps: readonly string[]): boolean {
   const normalized = normalizeIp(ip);
-  return trustedProxyIps.some((trusted) => normalizeIp(trusted) === normalized && isIP(normalized) !== 0);
+  return isIP(normalized) !== 0 && trustedProxyIps.some((trusted) => normalizeIp(trusted) === normalized);
 }
 
-/**
- * Resolves a client IP without trusting forwarded headers unless the immediate
- * peer is explicitly listed as a trusted proxy. X-Forwarded-For is processed
- * right-to-left, so a client cannot prepend a spoofed address and bypass the
- * limit when the trusted proxy appended the real client address.
- */
 export function resolveClientIp(event: H3Event, trustedProxyIps: readonly string[] = []): string | undefined {
   const peer = event.node.req.socket.remoteAddress;
   if (!peer) return undefined;
@@ -50,17 +43,19 @@ export function resolveClientIp(event: H3Event, trustedProxyIps: readonly string
 
 function routeKey(event: H3Event): string | undefined {
   if (event.node.req.method !== "POST") return undefined;
-  const path = event.path;
-  if (path === "/register") return "register";
-  if (path === "/login/password") return "login-password";
-  if (path === "/2fa/login") return "2fa-login";
-  if (path === "/verify/email/request") return "verify-email-request";
-  if (path === "/verify/phone/request") return "verify-phone-request";
-  if (path === "/verify/otp") return "verify-otp";
-  if (path === "/password/reset/request") return "password-reset-request";
-  if (path === "/password/reset/confirm") return "password-reset-confirm";
-  if (path === "/refresh") return "refresh";
-  return undefined;
+  const path = event.path.startsWith("/auth/") ? event.path.slice("/auth".length) : event.path;
+  switch (path) {
+    case "/register": return "register";
+    case "/login/password": return "login-password";
+    case "/2fa/login": return "2fa-login";
+    case "/verify/email/request": return "verify-email-request";
+    case "/verify/phone/request": return "verify-phone-request";
+    case "/verify/otp": return "verify-otp";
+    case "/password/reset/request": return "password-reset-request";
+    case "/password/reset/confirm": return "password-reset-confirm";
+    case "/refresh": return "refresh";
+    default: return undefined;
+  }
 }
 
 export function createIpRateLimitMiddleware(options: IpRateLimitOptions) {
