@@ -6,6 +6,7 @@ import { normalizeEmail } from "./credentials.js";
 import { createSession, DEFAULT_SESSION_POLICY } from "../session/service.js";
 import { signAccessToken } from "../crypto/jwt.js";
 import type { TwoFactorLoginService } from "./two-factor-login.js";
+import { DEFAULT_PASSWORD_LOGIN_RATE_LIMIT_POLICY, RateLimiter, type RateLimitPolicy } from "./rate-limit.js";
 
 export interface RegistrationTransactionStore {
   registerUser(input: { email: string; passwordHash: string; sessionId: string; familyId: string; refreshTokenHash: string; sessionExpiresAt: Date }): Promise<{ id: string; email: string | null }>;
@@ -29,6 +30,8 @@ export interface AuthServiceConfig {
   issuer?: string;
   audience?: string;
   twoFactorLogin?: TwoFactorLoginService;
+  loginRateLimiter?: RateLimiter;
+  loginRateLimitPolicy?: RateLimitPolicy;
 }
 
 export interface TwoFactorRequiredAuthentication {
@@ -55,8 +58,17 @@ export class AuthService {
     const email = normalizeEmail(emailInput);
     const user = await this.config.users.findByEmail(email);
     const passwordHash = user?.passwordCredential?.passwordHash;
-    if (!passwordHash) throw authErrors.invalidCredentials();
-    await verifyUserPassword(password, passwordHash);
+    if (!passwordHash) {
+      await this.recordFailedLogin(email);
+      throw authErrors.invalidCredentials();
+    }
+
+    try {
+      await verifyUserPassword(password, passwordHash);
+    } catch {
+      await this.recordFailedLogin(email);
+      throw authErrors.invalidCredentials();
+    }
 
     if (this.config.twoFactorLogin && await this.config.twoFactorLogin.configuredForUser(user.id)) {
       const challenge = await this.config.twoFactorLogin.createChallenge(user.id);
@@ -72,6 +84,14 @@ export class AuthService {
     const user = await this.config.users.findById(userId);
     if (!user) throw authErrors.invalidCredentials();
     return this.createSessionResult(user.id, user.email ?? "");
+  }
+
+  private async recordFailedLogin(email: string): Promise<void> {
+    if (!this.config.loginRateLimiter) return;
+    await this.config.loginRateLimiter.check(
+      `password-login:${email}`,
+      this.config.loginRateLimitPolicy ?? DEFAULT_PASSWORD_LOGIN_RATE_LIMIT_POLICY,
+    );
   }
 
   private async createSessionResult(userId: string, email: string) {
