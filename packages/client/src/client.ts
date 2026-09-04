@@ -1,5 +1,5 @@
 import { MemoryTokenStorage } from "./storage.js";
-import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type AuthTokens, type LogoutAllResult, type LogoutResult, type PasswordLoginResult, type PasswordResetConfirmResult, type PasswordResetRequestResult, type TokenStorage, type TwoFactorResult, type TwoFactorSetupResult, type TwoFactorRequiredResult, type VerificationChallengeResult, type VerificationResult } from "./types.js";
+import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type AuthTokens, type LogoutAllResult, type LogoutResult, type PasswordLoginResult, type PasswordResetConfirmResult, type PasswordResetRequestResult, type TokenStorage, type TwoFactorResult, type TwoFactorSetupResult, type VerificationChallengeResult, type VerificationResult } from "./types.js";
 import type { AuthErrorResponse, PasswordLoginRequest, PasswordResetConfirmRequest, PasswordResetRequest, PhoneVerificationRequest, RefreshRequest, RegisterRequest, TwoFactorCodeRequest, TwoFactorLoginRequest } from "@nabimo-auth/protocol";
 
 const JSON_CONTENT_TYPE = "application/json";
@@ -15,9 +15,9 @@ export class AuthClient {
     if (typeof this.requestFetch !== "function") throw new TypeError("A fetch implementation is required");
     this.storage = options.storage ?? new MemoryTokenStorage(); this.defaultHeaders = options.headers ?? {};
   }
-  async register(email: string, password: string): Promise<AuthenticationResult> { return this.authenticate("/auth/register", { email, password } satisfies RegisterRequest); }
-  async loginWithPassword(email: string, password: string): Promise<PasswordLoginResult> { return this.authenticate("/auth/login/password", { email, password } satisfies PasswordLoginRequest); }
-  async loginWithTwoFactor(challengeToken: string, code: string): Promise<AuthenticationResult> { return this.authenticate("/auth/2fa/login", { challengeToken, code } satisfies TwoFactorLoginRequest); }
+  async register(email: string, password: string): Promise<AuthenticationResult> { return this.authenticate<AuthenticationResult>("/auth/register", { email, password } satisfies RegisterRequest); }
+  async loginWithPassword(email: string, password: string): Promise<PasswordLoginResult> { return this.authenticate<PasswordLoginResult>("/auth/login/password", { email, password } satisfies PasswordLoginRequest); }
+  async loginWithTwoFactor(challengeToken: string, code: string): Promise<AuthenticationResult> { return this.authenticate<AuthenticationResult>("/auth/2fa/login", { challengeToken, code } satisfies TwoFactorLoginRequest); }
   async refresh(): Promise<AuthenticationResult> {
     const tokens = await this.storage.get(); if (!tokens?.refreshToken) throw new AuthClientError(401, "No refresh token available", "INVALID_CREDENTIALS", null);
     try { const result = await this.post<AuthenticationResult>("/auth/refresh", { refreshToken: tokens.refreshToken } satisfies RefreshRequest); await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken }); return result; }
@@ -43,8 +43,8 @@ export class AuthClient {
     if (options.body !== undefined) { if (typeof options.body === "string" || options.body instanceof FormData || options.body instanceof URLSearchParams || options.body instanceof Blob || options.body instanceof ArrayBuffer) body = options.body; else { body = JSON.stringify(options.body); if (!headers.has("Content-Type")) headers.set("Content-Type", JSON_CONTENT_TYPE); } }
     const response = await this.requestFetch(this.resolve(path), { ...options, body, headers }); return this.parseResponse<T>(response);
   }
-  private async authenticate(path: string, body: RegisterRequest | PasswordLoginRequest | TwoFactorLoginRequest): Promise<AuthenticationResult | PasswordLoginResult> {
-    const result = await this.post<AuthenticationResult | PasswordLoginResult>(path, body);
+  private async authenticate<T extends AuthenticationResult | PasswordLoginResult>(path: string, body: RegisterRequest | PasswordLoginRequest | TwoFactorLoginRequest): Promise<T> {
+    const result = await this.post<T>(path, body);
     if ("accessToken" in result) await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
     return result;
   }
