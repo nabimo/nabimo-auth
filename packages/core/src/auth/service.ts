@@ -5,6 +5,7 @@ import { createPasswordHash, verifyUserPassword } from "./password.js";
 import { normalizeEmail } from "./credentials.js";
 import { createSession, DEFAULT_SESSION_POLICY } from "../session/service.js";
 import { signAccessToken } from "../crypto/jwt.js";
+import type { TwoFactorLoginService } from "./two-factor-login.js";
 
 export interface RegistrationTransactionStore {
   registerUser(input: {
@@ -43,6 +44,14 @@ export interface AuthServiceConfig {
   jwtKeyId: string;
   issuer?: string;
   audience?: string;
+  twoFactorLogin?: TwoFactorLoginService;
+}
+
+export interface TwoFactorRequiredAuthentication {
+  twoFactorRequired: true;
+  user: { id: string; email: string };
+  challengeToken: string;
+  challengeExpiresAt: Date;
 }
 
 export class AuthService {
@@ -67,23 +76,45 @@ export class AuthService {
     return this.createAuthenticationResult(user.id, user.email ?? email, session);
   }
 
-  async loginWithPassword(emailInput: string, password: string) {
+  async loginWithPassword(emailInput: string, password: string): Promise<ReturnType<AuthService["createAuthenticationResult"]> | TwoFactorRequiredAuthentication> {
     const email = normalizeEmail(emailInput);
     const user = await this.config.users.findByEmail(email);
     const passwordHash = user?.passwordCredential?.passwordHash;
     if (!passwordHash) throw authErrors.invalidCredentials();
 
     await verifyUserPassword(password, passwordHash);
+
+    if (this.config.twoFactorLogin && await this.config.twoFactorLogin.configuredForUser(user.id)) {
+      const challenge = await this.config.twoFactorLogin.createChallenge(user.id);
+      return {
+        twoFactorRequired: true,
+        user: { id: user.id, email: user.email ?? email },
+        challengeToken: challenge.challengeToken,
+        challengeExpiresAt: challenge.expiresAt,
+      };
+    }
+
+    return this.createSessionResult(user.id, user.email ?? email);
+  }
+
+  async completeTwoFactorLogin(challengeToken: string, code: string) {
+    if (!this.config.twoFactorLogin) throw authErrors.invalidTwoFactorCode();
+    const userId = await this.config.twoFactorLogin.verifyChallenge(challengeToken, code);
+    const user = await this.config.users.findById?.(userId);
+    if (!user) throw authErrors.invalidCredentials();
+    return this.createSessionResult(user.id, user.email ?? "");
+  }
+
+  private async createSessionResult(userId: string, email: string) {
     const session = createSession();
     await this.config.sessions.create({
       id: session.sessionId,
-      userId: user.id,
+      userId,
       familyId: session.familyId,
       expiresAt: session.expiresAt,
       refreshTokenHash: session.refreshTokenHash,
     });
-
-    return this.createAuthenticationResult(user.id, user.email ?? email, session);
+    return this.createAuthenticationResult(userId, email, session);
   }
 
   private createAuthenticationResult(userId: string, email: string, session: ReturnType<typeof createSession>) {
