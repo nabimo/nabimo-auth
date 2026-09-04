@@ -7,7 +7,7 @@ function createStore(): VerificationStore {
     create: vi.fn(),
     createWithPolicy: vi.fn(),
     findActive: vi.fn(),
-    incrementAttempts: vi.fn(),
+    incrementAttempts: vi.fn().mockResolvedValue(true),
     consume: vi.fn().mockResolvedValue(true),
     markVerified: vi.fn(),
   };
@@ -102,7 +102,7 @@ describe("VerificationService", () => {
     expect(store.markVerified).toHaveBeenCalledWith("user-1", "phone_otp");
   });
 
-  it("increments attempts for an invalid OTP", async () => {
+  it("increments attempts for an invalid OTP using the configured limit", async () => {
     const store = createStore();
     const sender = createSender();
     vi.mocked(store.findActive).mockResolvedValue({
@@ -115,10 +115,30 @@ describe("VerificationService", () => {
       consumedAt: null,
       attempts: 0,
     });
-    const service = new VerificationService({ store, sender });
+    const service = new VerificationService({ store, sender, maxAttempts: 3 });
 
     await expect(service.verifyOtp("challenge-1", "654321")).rejects.toMatchObject({ code: "INVALID_OTP" });
-    expect(store.incrementAttempts).toHaveBeenCalledWith("challenge-1");
+    expect(store.incrementAttempts).toHaveBeenCalledWith("challenge-1", 3);
+    expect(store.consume).not.toHaveBeenCalled();
+  });
+
+  it("rejects an invalid OTP when the atomic attempt increment loses the limit race", async () => {
+    const store = createStore();
+    const sender = createSender();
+    vi.mocked(store.findActive).mockResolvedValue({
+      id: "challenge-1",
+      userId: "user-1",
+      type: "email_otp",
+      target: "user@example.com",
+      codeHash: sha256("123456"),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      attempts: 2,
+    });
+    vi.mocked(store.incrementAttempts).mockResolvedValue(false);
+    const service = new VerificationService({ store, sender, maxAttempts: 3 });
+
+    await expect(service.verifyOtp("challenge-1", "654321")).rejects.toMatchObject({ code: "INVALID_OTP" });
     expect(store.consume).not.toHaveBeenCalled();
   });
 
