@@ -37,9 +37,9 @@ export interface VerifyOtpRequest { challengeId: string; code: string; }
 
 export type AuthErrorCode =
   | "INVALID_REQUEST" | "INVALID_CREDENTIALS" | "ACCOUNT_ALREADY_EXISTS" | "INVALID_OTP"
-  | "OTP_COOLDOWN" | "OTP_RATE_LIMITED" | "INVALID_PASSWORD_RESET_TOKEN"
+  | "OTP_COOLDOWN" | "OTP_RATE_LIMITED" | "RATE_LIMITED" | "INVALID_PASSWORD_RESET_TOKEN"
   | "TWO_FACTOR_REQUIRED" | "INVALID_2FA_CODE" | "NOT_CONFIGURED";
-export interface AuthErrorData { code?: AuthErrorCode; }
+export interface AuthErrorData { code?: AuthErrorCode; retryAfterSeconds?: number; }
 export interface AuthErrorResponse { statusCode?: number; statusMessage?: string; message?: string; data?: AuthErrorData; }
 
 export const AUTH_ENDPOINTS = {
