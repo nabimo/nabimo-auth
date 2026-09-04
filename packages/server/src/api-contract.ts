@@ -12,6 +12,7 @@ export type {
   PasswordResetConfirmResponse,
   PasswordResetRequest,
   PasswordResetRequestResponse,
+  PhoneVerificationRequest,
   RefreshRequest,
   RegisterRequest,
   VerificationChallengeResponse,
