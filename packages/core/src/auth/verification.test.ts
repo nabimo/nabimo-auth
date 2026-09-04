@@ -8,7 +8,7 @@ function createStore(): VerificationStore {
     createWithPolicy: vi.fn(),
     findActive: vi.fn(),
     incrementAttempts: vi.fn(),
-    consume: vi.fn(),
+    consume: vi.fn().mockResolvedValue(true),
     markVerified: vi.fn(),
   };
 }
@@ -120,5 +120,25 @@ describe("VerificationService", () => {
     await expect(service.verifyOtp("challenge-1", "654321")).rejects.toMatchObject({ code: "INVALID_OTP" });
     expect(store.incrementAttempts).toHaveBeenCalledWith("challenge-1");
     expect(store.consume).not.toHaveBeenCalled();
+  });
+
+  it("rejects a correct OTP when another request consumed the challenge first", async () => {
+    const store = createStore();
+    const sender = createSender();
+    vi.mocked(store.findActive).mockResolvedValue({
+      id: "challenge-1",
+      userId: "user-1",
+      type: "email_otp",
+      target: "user@example.com",
+      codeHash: sha256("123456"),
+      expiresAt: new Date(Date.now() + 60_000),
+      consumedAt: null,
+      attempts: 0,
+    });
+    vi.mocked(store.consume).mockResolvedValue(false);
+    const service = new VerificationService({ store, sender });
+
+    await expect(service.verifyOtp("challenge-1", "123456")).rejects.toMatchObject({ code: "INVALID_OTP" });
+    expect(store.markVerified).not.toHaveBeenCalled();
   });
 });
