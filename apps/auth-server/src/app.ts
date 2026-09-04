@@ -3,11 +3,23 @@ import { createServer } from "node:http";
 import { createPublicKey } from "node:crypto";
 import { AuthService, AccessTokenValidationService, PasswordResetService, RateLimiter, RefreshService, SessionManagementService, TwoFactorService, TwoFactorLoginService, VerificationService } from "@nabimo-auth/core";
 import { getDatabaseClient, UserRepository, PrismaSessionStore, PrismaRegistrationTransactionStore, PrismaSessionManagementStore, PrismaRefreshTokenStore, PrismaVerificationStore, PrismaPasswordResetStore, PrismaTwoFactorStore, PrismaTwoFactorLoginStore, PrismaRateLimitStore } from "@nabimo-auth/database";
-import { createAuthRouter } from "@nabimo-auth/server";
+import { createAuthRouter, createIpRateLimitMiddleware } from "@nabimo-auth/server";
 import { loadConfig } from "./config.js";
 import { ConsoleVerificationCodeSender } from "./verification-sender.js";
 import { ConsolePasswordResetSender } from "./password-reset-sender.js";
 import { AesTwoFactorSecretCipher } from "./two-factor-cipher.js";
+
+const IP_RATE_LIMIT_POLICIES = {
+  register: { limit: 10, windowSeconds: 60 },
+  "login-password": { limit: 30, windowSeconds: 60 },
+  "2fa-login": { limit: 20, windowSeconds: 60 },
+  "verify-email-request": { limit: 10, windowSeconds: 60 },
+  "verify-phone-request": { limit: 10, windowSeconds: 60 },
+  "verify-otp": { limit: 20, windowSeconds: 60 },
+  "password-reset-request": { limit: 10, windowSeconds: 60 },
+  "password-reset-confirm": { limit: 20, windowSeconds: 60 },
+  refresh: { limit: 60, windowSeconds: 60 },
+} as const;
 
 export function createAuthApp() {
   const config = loadConfig();
@@ -25,6 +37,7 @@ export function createAuthApp() {
   const twoFactor = new TwoFactorService({ store: new PrismaTwoFactorStore(db), cipher: new AesTwoFactorSecretCipher(config.twoFactorEncryptionKey), sessions: sessionManagement, issuer: config.issuer });
   const twoFactorLogin = new TwoFactorLoginService({ store: new PrismaTwoFactorLoginStore(db), twoFactor });
   const loginRateLimiter = new RateLimiter(new PrismaRateLimitStore(db));
+  const ipRateLimiter = new RateLimiter(new PrismaRateLimitStore(db));
   const publicKeyPem = createPublicKey(config.jwtPrivateKeyPem).export({ type: "spki", format: "pem" }).toString();
 
   const auth = new AuthService({ users, sessions, registration, jwtPrivateKeyPem: config.jwtPrivateKeyPem, jwtKeyId: config.jwtKeyId, issuer: config.issuer, audience: config.audience, twoFactorLogin, loginRateLimiter });
@@ -33,6 +46,7 @@ export function createAuthApp() {
 
   const app = createApp();
   app.use("/health", eventHandler(() => ({ status: "ok" })));
+  app.use("/auth", createIpRateLimitMiddleware({ limiter: ipRateLimiter, trustedProxyIps: config.trustedProxyIps, policies: IP_RATE_LIMIT_POLICIES }));
   app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, twoFactor, twoFactorLogin, users }).handler);
   return { app, db };
 }
