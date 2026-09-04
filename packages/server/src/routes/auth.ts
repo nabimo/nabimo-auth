@@ -1,4 +1,5 @@
 import { createError, createRouter, eventHandler, getHeader, readBody, type H3Event } from "h3";
+import { createHash } from "node:crypto";
 import { AccessTokenValidationService, AuthError, AuthService, normalizePhone, PasswordResetService, RefreshService, SessionManagementService, TwoFactorService, TwoFactorLoginService, VerificationService } from "@nabimo-auth/core";
 import type { AuthenticationResponse, LogoutAllResponse, LogoutResponse, PasswordLoginResponse, PasswordResetConfirmResponse, PasswordResetRequestResponse, TwoFactorCodeRequest, TwoFactorLoginRequest, TwoFactorSetupResponse, TwoFactorSuccessResponse, VerificationChallengeResponse, VerificationSuccessResponse } from "../api-contract.js";
 
@@ -108,8 +109,8 @@ export function createAuthRouter({ auth, accessTokens, refresh, sessionManagemen
   })));
   return router;
 }
-async function withAuthErrors<T>(handler: () => Promise<T>): Promise<T> { try { return await handler(); } catch (error) { if (isHttpError(error)) throw error; if (error instanceof AuthError) throw httpError(authErrorStatus(error.code), error.code, error.message); throw error; } }
-function httpError(statusCode: number, code: string, message: string) { return createError({ statusCode, statusMessage: message, data: { code } }); }
+async function withAuthErrors<T>(handler: () => Promise<T>): Promise<T> { try { return await handler(); } catch (error) { if (isHttpError(error)) throw error; if (error instanceof AuthError) throw httpError(authErrorStatus(error.code), error.code, error.message, error.retryAfterSeconds); throw error; } }
+function httpError(statusCode: number, code: string, message: string, retryAfterSeconds?: number) { return createError({ statusCode, statusMessage: message, headers: retryAfterSeconds === undefined ? undefined : { "retry-after": String(retryAfterSeconds) }, data: { code, ...(retryAfterSeconds === undefined ? {} : { retryAfterSeconds }) } }); }
 function isHttpError(error: unknown): error is { statusCode: number } { return typeof error === "object" && error !== null && "statusCode" in error; }
-function authErrorStatus(code: string): number { switch (code) { case "ACCOUNT_ALREADY_EXISTS": return 409; case "OTP_COOLDOWN": case "OTP_RATE_LIMITED": return 429; case "INVALID_CREDENTIALS": case "INVALID_OTP": case "INVALID_PASSWORD_RESET_TOKEN": case "INVALID_2FA_CODE": case "TWO_FACTOR_REQUIRED": return 401; default: return 400; } }
+function authErrorStatus(code: string): number { switch (code) { case "ACCOUNT_ALREADY_EXISTS": return 409; case "OTP_COOLDOWN": case "OTP_RATE_LIMITED": case "RATE_LIMITED": return 429; case "INVALID_CREDENTIALS": case "INVALID_OTP": case "INVALID_PASSWORD_RESET_TOKEN": case "INVALID_2FA_CODE": case "TWO_FACTOR_REQUIRED": return 401; default: return 400; } }
 function getBearerToken(event: H3Event): string | null { const authorization = getHeader(event, "authorization"); if (!authorization) return null; return /^Bearer ([^\s]+)$/.exec(authorization)?.[1] ?? null; }
