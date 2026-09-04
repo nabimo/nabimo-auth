@@ -11,9 +11,14 @@
     ".": "./dist/index.js"
   },
   "scripts": {
+    "generate": "prisma generate --config ../../prisma.config.ts",
+    "prebuild": "pnpm generate",
     "build": "tsc",
+    "prelint": "pnpm generate",
     "lint": "eslint .",
+    "pretest": "pnpm generate",
     "test": "vitest run --passWithNoTests",
+    "pretypecheck": "pnpm generate",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
