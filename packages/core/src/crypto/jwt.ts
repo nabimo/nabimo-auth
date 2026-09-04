@@ -44,10 +44,14 @@ export function verifyAccessToken(
   if (parts.length !== 3 || !Number.isSafeInteger(now)) return null;
 
   try {
-    const header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")) as { alg?: string; typ?: string };
-    if (header.alg !== "EdDSA" || header.typ !== "JWT") return null;
+    const header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8")) as {
+      alg?: unknown;
+      typ?: unknown;
+      kid?: unknown;
+    };
+    if (header.alg !== "EdDSA" || header.typ !== "JWT" || typeof header.kid !== "string" || !header.kid) return null;
 
-    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as AccessTokenClaims;
+    const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as Partial<AccessTokenClaims>;
     const valid = verify(
       null,
       Buffer.from(`${parts[0]}.${parts[1]}`),
@@ -55,12 +59,19 @@ export function verifyAccessToken(
       Buffer.from(parts[2], "base64url"),
     );
 
-    if (!valid || !payload.sub || !payload.sid || !payload.jti || !payload.iss || !payload.aud) return null;
+    if (!valid) return null;
+    if (
+      typeof payload.sub !== "string" || !payload.sub ||
+      typeof payload.sid !== "string" || !payload.sid ||
+      typeof payload.jti !== "string" || !payload.jti ||
+      typeof payload.iss !== "string" || !payload.iss ||
+      typeof payload.aud !== "string" || !payload.aud
+    ) return null;
     if (!Number.isSafeInteger(payload.exp) || !Number.isSafeInteger(payload.iat)) return null;
     if (payload.exp <= now || payload.exp <= payload.iat) return null;
     if (payload.iat > now + MAX_CLOCK_SKEW_SECONDS) return null;
 
-    return payload;
+    return payload as AccessTokenClaims;
   } catch {
     return null;
   }
