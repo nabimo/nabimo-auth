@@ -44,7 +44,8 @@ export interface VerificationStore {
   }): Promise<void>;
   findActive(id: string, now: Date): Promise<VerificationRecord | null>;
   incrementAttempts(id: string): Promise<void>;
-  consume(id: string, now: Date): Promise<void>;
+  /** Atomically consumes an active challenge. */
+  consume(id: string, now: Date): Promise<boolean>;
   markVerified(userId: string, type: OtpVerificationType): Promise<void>;
 }
 
@@ -103,7 +104,10 @@ export class VerificationService {
       throw authErrors.invalidOtp();
     }
 
-    await this.config.store.consume(challengeId, now);
+    // Consume atomically so concurrent requests cannot both verify the same OTP.
+    const consumed = await this.config.store.consume(challengeId, now);
+    if (!consumed) throw authErrors.invalidOtp();
+
     if (challenge.userId) await this.config.store.markVerified(challenge.userId, challenge.type);
   }
 
