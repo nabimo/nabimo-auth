@@ -6,7 +6,7 @@ import type { TwoFactorService } from "./two-factor.js";
 
 export interface TwoFactorLoginChallenge { challengeToken: string; userId: string; expiresAt: Date; }
 export interface TwoFactorLoginStore {
-  create(input: { id: string; userId: string; tokenHash: string; expiresAt: Date }): Promise<void>;
+  create(input: { id: string; userId: string; tokenHash: string; expiresAt: Date; maxActiveChallenges: number }): Promise<void>;
   find(input: { tokenHash: string; now: Date }): Promise<{ userId: string } | null>;
   incrementAttempts(input: { tokenHash: string; now: Date; maxAttempts: number }): Promise<boolean>;
   consume(input: { tokenHash: string; now: Date }): Promise<boolean>;
@@ -16,21 +16,24 @@ export interface TwoFactorLoginServiceConfig {
   twoFactor: Pick<TwoFactorService, "verify" | "verifyRecoveryCode" | "isEnabled">;
   ttlSeconds?: number;
   maxAttempts?: number;
+  maxActiveChallenges?: number;
 }
 
 export class TwoFactorLoginService {
   private readonly ttlSeconds: number;
   private readonly maxAttempts: number;
+  private readonly maxActiveChallenges: number;
   constructor(private readonly config: TwoFactorLoginServiceConfig) {
     this.ttlSeconds = config.ttlSeconds ?? 5 * 60;
     this.maxAttempts = config.maxAttempts ?? 5;
+    this.maxActiveChallenges = config.maxActiveChallenges ?? 3;
   }
   async configuredForUser(userId: string): Promise<boolean> { return this.config.twoFactor.isEnabled(userId); }
   async createChallenge(userId: string): Promise<TwoFactorLoginChallenge> {
     if (!await this.config.twoFactor.isEnabled(userId)) throw authErrors.invalidTwoFactorCode();
     const { token, hash } = generateToken(32);
     const expiresAt = new Date(Date.now() + this.ttlSeconds * 1000);
-    await this.config.store.create({ id: randomUUID(), userId, tokenHash: hash, expiresAt });
+    await this.config.store.create({ id: randomUUID(), userId, tokenHash: hash, expiresAt, maxActiveChallenges: this.maxActiveChallenges });
     return { challengeToken: token, userId, expiresAt };
   }
   async verifyChallenge(challengeToken: string, code: string): Promise<string> {
