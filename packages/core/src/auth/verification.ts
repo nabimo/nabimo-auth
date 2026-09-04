@@ -1,6 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import { authErrors } from "./errors.js";
-import { normalizeEmail } from "./credentials.js";
+import { normalizeEmail, normalizePhone } from "./credentials.js";
 import { sha256 } from "../crypto/hash.js";
 
 export type OtpVerificationType = "email_otp" | "phone_otp";
@@ -87,8 +87,8 @@ export class VerificationService {
     return this.requestOtp(userId, "email_otp", normalizeEmail(emailInput));
   }
 
-  async requestPhoneOtp(userId: string | null, phone: string): Promise<OtpChallenge> {
-    return this.requestOtp(userId, "phone_otp", phone);
+  async requestPhoneOtp(userId: string | null, phoneInput: string): Promise<OtpChallenge> {
+    return this.requestOtp(userId, "phone_otp", normalizePhone(phoneInput));
   }
 
   async verifyOtp(challengeId: string, code: string): Promise<void> {
