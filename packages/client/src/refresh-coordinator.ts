@@ -66,4 +66,39 @@ export class InMemoryRefreshCoordinator implements RefreshCoordinator {
   }
 }
 
+export interface WebLockManagerLike {
+  request<T>(name: string, callback: () => Promise<T> | T): Promise<T>;
+}
+
+/**
+ * Coordinates refreshes across same-origin browser contexts with Web Locks.
+ *
+ * This coordinator never shares access or refresh tokens between contexts.
+ * Each waiting context obtains the lock and performs its own refresh request;
+ * with CookieRefreshTransport, the browser supplies the current HttpOnly
+ * refresh cookie and the server rotates it atomically.
+ *
+ * If Web Locks are unavailable, it falls back to in-memory coordination.
+ */
+export class BrowserRefreshCoordinator implements RefreshCoordinator {
+  private readonly fallback = new InMemoryRefreshCoordinator();
+
+  constructor(
+    private readonly lockManager: WebLockManagerLike | undefined = getWebLockManager(),
+    private readonly lockName = "nabimo-auth-refresh",
+  ) {}
+
+  run<T>(task: () => Promise<T>): Promise<T> {
+    if (!this.lockManager) return this.fallback.run(task);
+    return this.lockManager.request(this.lockName, task);
+  }
+}
+
+function getWebLockManager(): WebLockManagerLike | undefined {
+  if (typeof navigator === "undefined") return undefined;
+  const locks = navigator.locks;
+  if (!locks || typeof locks.request !== "function") return undefined;
+  return locks;
+}
+
 export type RefreshResult = AuthenticationResponse;
