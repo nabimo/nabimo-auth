@@ -107,4 +107,22 @@ describe("AuthClient", () => {
     await expect(client.request("/protected", { auth: true })).rejects.toMatchObject({ status: 401 });
     expect(paths).toEqual(["/protected", "/auth/refresh", "/protected"]);
   });
+
+  it("rejects authenticated requests to a different origin", async () => {
+    const fetch = vi.fn();
+    const storage = { get: vi.fn().mockResolvedValue({ accessToken: "secret", refreshToken: "refresh" }), set: vi.fn(), clear: vi.fn() };
+    const client = new AuthClient({ baseUrl: "https://auth.example.com", fetch, storage });
+
+    await expect(client.request("https://attacker.example/collect", { auth: true })).rejects.toThrow("Authenticated requests cannot target a different origin");
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("allows an explicit same-origin authenticated URL", async () => {
+    const fetch = vi.fn().mockResolvedValue(response({ ok: true }));
+    const storage = { get: vi.fn().mockResolvedValue({ accessToken: "access-token", refreshToken: "refresh-token" }), set: vi.fn(), clear: vi.fn() };
+    const client = new AuthClient({ baseUrl: "https://auth.example.com", fetch, storage });
+
+    await expect(client.request("https://auth.example.com/protected", { auth: true })).resolves.toEqual({ ok: true });
+    expect(fetch.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer access-token");
+  });
 });
