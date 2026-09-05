@@ -1,5 +1,3 @@
-import type { AuthenticationResponse } from "@nabimo-auth/protocol";
-
 export interface RefreshCoordinator {
   run<T>(task: () => Promise<T>): Promise<T>;
 }
@@ -100,5 +98,3 @@ function getWebLockManager(): WebLockManagerLike | undefined {
   if (!locks || typeof locks.request !== "function") return undefined;
   return locks;
 }
-
-export type RefreshResult = AuthenticationResponse;
