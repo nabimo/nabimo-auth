@@ -160,4 +160,76 @@ describe("auth server contract", () => {
     await expect(response.json()).resolves.toEqual({ success: true });
     expect(verification.verifyOtp).toHaveBeenCalledWith("challenge-1", "123456");
   });
+
+  it("sets an HttpOnly refresh cookie and omits the refresh token from registration JSON", async () => {
+    const result = {
+      user: { id: "user-1", email: "user@example.com" },
+      sessionId: "session-1",
+      accessToken: "access-token",
+      refreshToken: "refresh-token",
+    };
+    const { app } = createTestApp({
+      auth: { registerWithPassword: vi.fn().mockResolvedValue(result), loginWithPassword: vi.fn() },
+      refreshCookie: { enabled: true, secure: true, sameSite: "Strict" },
+    });
+    const response = await request(app, "/auth/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "user@example.com", password: "password" }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ user: result.user, sessionId: result.sessionId, accessToken: result.accessToken });
+    const cookie = response.headers.get("set-cookie");
+    expect(cookie).toContain("nabimo_refresh=refresh-token");
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Secure");
+    expect(cookie).toContain("SameSite=Strict");
+    expect(cookie).toContain("Path=/auth/refresh");
+    expect(cookie).toContain("Max-Age=2592000");
+  });
+
+  it("refreshes using the HttpOnly cookie and rotates it", async () => {
+    const refresh = { refresh: vi.fn().mockResolvedValue({
+      user: { id: "user-1", email: "user@example.com" },
+      sessionId: "session-1",
+      accessToken: "access-token-2",
+      refreshToken: "refresh-token-2",
+    }) };
+    const { app } = createTestApp({ refresh, refreshCookie: { enabled: true, secure: true, sameSite: "Lax" } });
+    const response = await request(app, "/auth/refresh", {
+      method: "POST",
+      headers: { cookie: "nabimo_refresh=refresh-token-1" },
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ user: { id: "user-1", email: "user@example.com" }, sessionId: "session-1", accessToken: "access-token-2" });
+    expect(refresh.refresh).toHaveBeenCalledWith("refresh-token-1");
+    expect(response.headers.get("set-cookie")).toContain("nabimo_refresh=refresh-token-2");
+  });
+
+  it("clears the refresh cookie on logout", async () => {
+    const { app } = createTestApp({ refreshCookie: { enabled: true, secure: true, sameSite: "Strict" } });
+    const response = await request(app, "/auth/logout", {
+      method: "POST",
+      headers: { authorization: "Bearer access-token" },
+    });
+    expect(response.status).toBe(200);
+    const cookie = response.headers.get("set-cookie");
+    expect(cookie).toContain("nabimo_refresh=");
+    expect(cookie).toContain("Max-Age=0");
+    expect(cookie).toContain("Expires=Thu, 01 Jan 1970 00:00:00 GMT");
+  });
+
+  it("keeps bearer refresh backward compatible when cookie mode is disabled", async () => {
+    const refresh = { refresh: vi.fn().mockResolvedValue({ ok: true, refreshToken: "refresh-token-2" }) };
+    const { app } = createTestApp({ refresh });
+    const response = await request(app, "/auth/refresh", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refreshToken: "refresh-token-1" }),
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ ok: true, refreshToken: "refresh-token-2" });
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(refresh.refresh).toHaveBeenCalledWith("refresh-token-1");
+  });
 });
