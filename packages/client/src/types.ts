@@ -1,5 +1,5 @@
 import type { AuthErrorResponse, AuthUserResponse, AuthenticationResponse, LogoutAllResponse, LogoutResponse, PasswordLoginResponse, PasswordResetConfirmResponse, PasswordResetRequestResponse, TwoFactorSetupResponse, TwoFactorSuccessResponse, TwoFactorRequiredResponse, VerificationChallengeResponse, VerificationSuccessResponse } from "@nabimo-auth/protocol";
-import type { RefreshCoordinator } from "./refresh-coordinator.js";
+import type { RefreshCoordinator, RefreshTransport } from "./refresh-coordinator.js";
 
 export type AuthUser = AuthUserResponse;
 export type AuthenticationResult = AuthenticationResponse;
@@ -17,7 +17,7 @@ export type { AuthErrorResponse };
 
 export interface AuthTokens { accessToken: string; refreshToken: string; }
 export interface TokenStorage { get(): AuthTokens | null | Promise<AuthTokens | null>; set(tokens: AuthTokens): void | Promise<void>; clear(): void | Promise<void>; }
-export interface AuthClientOptions { baseUrl: string; fetch?: typeof globalThis.fetch; storage?: TokenStorage; headers?: HeadersInit; refreshCoordinator?: RefreshCoordinator; }
+export interface AuthClientOptions { baseUrl: string; fetch?: typeof globalThis.fetch; storage?: TokenStorage; headers?: HeadersInit; refreshCoordinator?: RefreshCoordinator; refreshTransport?: RefreshTransport; }
 export interface AuthRequestOptions extends Omit<RequestInit, "body" | "headers"> { body?: unknown; headers?: HeadersInit; auth?: boolean; }
 export class AuthClientError extends Error {
   readonly status: number;
