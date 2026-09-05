@@ -8,6 +8,7 @@ export type {
   AuthTokens,
   AuthUser,
   AuthenticationResult,
+  RefreshResult,
   PasswordLoginResult,
   TwoFactorRequiredResult,
   LogoutAllResult,
