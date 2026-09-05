@@ -1,8 +1,8 @@
-import { InMemoryRefreshCoordinator } from "./refresh-coordinator.js";
+import { BearerRefreshTransport, InMemoryRefreshCoordinator } from "./refresh-coordinator.js";
 import { MemoryTokenStorage } from "./storage.js";
 import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type AuthTokens, type LogoutAllResult, type LogoutResult, type PasswordLoginResult, type PasswordResetConfirmResult, type PasswordResetRequestResult, type TokenStorage, type TwoFactorResult, type TwoFactorSetupResult, type VerificationChallengeResult, type VerificationResult } from "./types.js";
 import type { AuthErrorResponse, PasswordLoginRequest, PasswordResetConfirmRequest, PasswordResetRequest, PhoneVerificationRequest, RegisterRequest, TwoFactorCodeRequest, TwoFactorLoginRequest } from "@nabimo-auth/protocol";
-import type { RefreshCoordinator } from "./refresh-coordinator.js";
+import type { RefreshCoordinator, RefreshTransport } from "./refresh-coordinator.js";
 
 const JSON_CONTENT_TYPE = "application/json";
 
@@ -12,6 +12,7 @@ export class AuthClient {
   private readonly storage: TokenStorage;
   private readonly defaultHeaders: HeadersInit;
   private readonly refreshCoordinator: RefreshCoordinator;
+  private readonly refreshTransport: RefreshTransport;
 
   constructor(options: AuthClientOptions) {
     if (!options.baseUrl || typeof options.baseUrl !== "string") throw new TypeError("baseUrl is required");
@@ -19,6 +20,7 @@ export class AuthClient {
     if (typeof this.requestFetch !== "function") throw new TypeError("A fetch implementation is required");
     this.storage = options.storage ?? new MemoryTokenStorage(); this.defaultHeaders = options.headers ?? {};
     this.refreshCoordinator = options.refreshCoordinator ?? new InMemoryRefreshCoordinator();
+    this.refreshTransport = options.refreshTransport ?? new BearerRefreshTransport();
   }
 
   async register(email: string, password: string): Promise<AuthenticationResult> { return this.authenticate<AuthenticationResult>("/auth/register", { email, password } satisfies RegisterRequest); }
@@ -67,11 +69,12 @@ export class AuthClient {
 
   private async performRefresh(): Promise<AuthenticationResult> {
     const tokens = await this.storage.get();
-    if (!tokens?.refreshToken) throw new AuthClientError(401, "No refresh token available", "INVALID_CREDENTIALS", null);
     try {
-      const result = await this.post<AuthenticationResult>("/auth/refresh", { refreshToken: tokens.refreshToken });
-      await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
-      return result;
+      const refreshRequest = this.refreshTransport.createRequest(tokens?.refreshToken ?? null);
+      const result = await this.requestFetch(this.resolve("/auth/refresh", false), refreshRequest);
+      const parsed = await this.parseResponse<AuthenticationResult>(result);
+      await this.storage.set({ accessToken: parsed.accessToken, refreshToken: parsed.refreshToken });
+      return parsed;
     } catch (error) {
       if (error instanceof AuthClientError && error.status === 401) await this.storage.clear();
       throw error;
