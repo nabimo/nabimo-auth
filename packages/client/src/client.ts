@@ -1,6 +1,6 @@
 import { BearerRefreshTransport, InMemoryRefreshCoordinator } from "./refresh-coordinator.js";
 import { MemoryTokenStorage } from "./storage.js";
-import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type AuthTokens, type LogoutAllResult, type LogoutResult, type PasswordLoginResult, type PasswordResetConfirmResult, type PasswordResetRequestResult, type TokenStorage, type TwoFactorResult, type TwoFactorSetupResult, type VerificationChallengeResult, type VerificationResult } from "./types.js";
+import { AuthClientError, type AuthClientOptions, type AuthRequestOptions, type AuthenticationResult, type AuthTokens, type LogoutAllResult, type LogoutResult, type PasswordLoginResult, type PasswordResetConfirmResult, type PasswordResetRequestResult, type RefreshResult, type TokenStorage, type TwoFactorResult, type TwoFactorSetupResult, type VerificationChallengeResult, type VerificationResult } from "./types.js";
 import type { AuthErrorResponse, PasswordLoginRequest, PasswordResetConfirmRequest, PasswordResetRequest, PhoneVerificationRequest, RegisterRequest, TwoFactorCodeRequest, TwoFactorLoginRequest } from "@nabimo-auth/protocol";
 import type { RefreshCoordinator, RefreshTransport } from "./refresh-coordinator.js";
 
@@ -27,7 +27,7 @@ export class AuthClient {
   async loginWithPassword(email: string, password: string): Promise<PasswordLoginResult> { return this.authenticate<PasswordLoginResult>("/auth/login/password", { email, password } satisfies PasswordLoginRequest); }
   async loginWithTwoFactor(challengeToken: string, code: string): Promise<AuthenticationResult> { return this.authenticate<AuthenticationResult>("/auth/2fa/login", { challengeToken, code } satisfies TwoFactorLoginRequest); }
 
-  async refresh(): Promise<AuthenticationResult> { return this.refreshCoordinator.run(() => this.performRefresh()); }
+  async refresh(): Promise<RefreshResult> { return this.refreshCoordinator.run(() => this.performRefresh()); }
 
   async requestEmailVerification(email: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/email/request", { email }, true); }
   async requestPhoneVerification(phone: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/phone/request", { phone } satisfies PhoneVerificationRequest, true); }
@@ -67,13 +67,17 @@ export class AuthClient {
     return this.parseResponse<T>(response);
   }
 
-  private async performRefresh(): Promise<AuthenticationResult> {
+  private async performRefresh(): Promise<RefreshResult> {
     const tokens = await this.storage.get();
     try {
       const refreshRequest = this.refreshTransport.createRequest(tokens?.refreshToken ?? null);
       const result = await this.requestFetch(this.resolve("/auth/refresh", false), refreshRequest);
-      const parsed = await this.parseResponse<AuthenticationResult>(result);
-      await this.storage.set({ accessToken: parsed.accessToken, refreshToken: parsed.refreshToken });
+      const parsed = await this.parseResponse<RefreshResult>(result);
+      if ("refreshToken" in parsed) {
+        await this.storage.set({ accessToken: parsed.accessToken, refreshToken: parsed.refreshToken });
+      } else {
+        await this.storage.set({ accessToken: parsed.accessToken });
+      }
       return parsed;
     } catch (error) {
       if (error instanceof AuthClientError && error.status === 401) await this.storage.clear();
@@ -81,7 +85,7 @@ export class AuthClient {
     }
   }
 
-  private async authenticate<T extends AuthenticationResult | PasswordLoginResult>(path: string, body: RegisterRequest | PasswordLoginRequest | TwoFactorLoginRequest): Promise<T> { const result = await this.post<T>(path, body); if ("accessToken" in result) await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken }); return result; }
+  private async authenticate<T extends AuthenticationResult | PasswordLoginResult>(path: string, body: RegisterRequest | PasswordLoginRequest | TwoFactorLoginRequest): Promise<T> { const result = await this.post<T>(path, body); if ("accessToken" in result && "refreshToken" in result) await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken }); return result; }
   private async post<T>(path: string, body: unknown, auth = false): Promise<T> { return this.request<T>(path, { method: "POST", body, auth }); }
   private resolve(path: string, authenticated: boolean): string { if (!/^https?:\/\//i.test(path)) return `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`; const url = new URL(path); if (authenticated && url.origin !== new URL(this.baseUrl).origin) throw new TypeError("Authenticated requests cannot target a different origin"); return url.toString(); }
   private async parseResponse<T>(response: Response): Promise<T> { const text = await response.text(); let payload: unknown = null; if (text) { try { payload = JSON.parse(text); } catch { payload = text; } } if (!response.ok) { const code = this.extractErrorCode(payload); const message = (this.extractErrorMessage(payload) ?? response.statusText) || `HTTP ${response.status}`; throw new AuthClientError(response.status, message, code, payload); } return payload as T; }
