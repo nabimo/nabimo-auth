@@ -32,8 +32,8 @@ export class AuthClient {
   async requestEmailVerification(email: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/email/request", { email }, true); }
   async requestPhoneVerification(phone: string): Promise<VerificationChallengeResult> { return this.post<VerificationChallengeResult>("/auth/verify/phone/request", { phone } satisfies PhoneVerificationRequest, true); }
   async verifyOtp(challengeId: string, code: string): Promise<VerificationResult> { return this.post<VerificationResult>("/auth/verify/otp", { challengeId, code }); }
-  async requestPasswordReset(email: string): Promise<PasswordResetRequestResult> { return this.post<PasswordResetRequestResult>("/auth/password/reset/request", { email } satisfies PasswordResetRequest); }
-  async confirmPasswordReset(token: string, newPassword: string): Promise<PasswordResetConfirmResult> { return this.post<PasswordResetConfirmResult>("/auth/password/reset/confirm", { token, newPassword } satisfies PasswordResetConfirmRequest); }
+  async requestPasswordReset(email: string): Promise<PasswordResetRequestResponse> { return this.post<PasswordResetRequestResponse>("/auth/password/reset/request", { email } satisfies PasswordResetRequest); }
+  async confirmPasswordReset(token: string, newPassword: string): Promise<PasswordResetConfirmResponse> { return this.post<PasswordResetConfirmResponse>("/auth/password/reset/confirm", { token, newPassword } satisfies PasswordResetConfirmRequest); }
   async setupTwoFactor(): Promise<TwoFactorSetupResult> { return this.post<TwoFactorSetupResult>("/auth/2fa/setup", {}, true); }
   async enableTwoFactor(code: string): Promise<TwoFactorResult> { return this.post<TwoFactorResult>("/auth/2fa/enable", { code } satisfies TwoFactorCodeRequest, true); }
   async disableTwoFactor(code: string): Promise<TwoFactorResult> { return this.post<TwoFactorResult>("/auth/2fa/disable", { code } satisfies TwoFactorCodeRequest, true); }
@@ -54,14 +54,15 @@ export class AuthClient {
     let body: BodyInit | undefined;
     if (options.body !== undefined) { if (typeof options.body === "string" || options.body instanceof FormData || options.body instanceof URLSearchParams || options.body instanceof Blob || options.body instanceof ArrayBuffer) body = options.body; else { body = JSON.stringify(options.body); if (!headers.has("Content-Type")) headers.set("Content-Type", JSON_CONTENT_TYPE); } }
 
-    const response = await this.requestFetch(this.resolve(path), { ...options, body, headers });
+    const url = this.resolve(path, authenticated);
+    const response = await this.requestFetch(url, { ...options, body, headers });
     if (authenticated && response.status === 401) {
       await this.refresh();
       const retryHeaders = new Headers(this.defaultHeaders); new Headers(options.headers).forEach((value, key) => retryHeaders.set(key, value));
       const accessToken = (await this.storage.get())?.accessToken;
       if (!accessToken) throw new AuthClientError(401, "No access token available", "INVALID_CREDENTIALS", null);
       retryHeaders.set("Authorization", `Bearer ${accessToken}`);
-      const retryResponse = await this.requestFetch(this.resolve(path), { ...options, body, headers: retryHeaders });
+      const retryResponse = await this.requestFetch(url, { ...options, body, headers: retryHeaders });
       return this.parseResponse<T>(retryResponse);
     }
     return this.parseResponse<T>(response);
@@ -71,7 +72,7 @@ export class AuthClient {
     const tokens = await this.storage.get();
     if (!tokens?.refreshToken) throw new AuthClientError(401, "No refresh token available", "INVALID_CREDENTIALS", null);
     try {
-      const result = await this.post<AuthenticationResult>("/auth/refresh", { refreshToken: tokens.refreshToken } satisfies RefreshRequest);
+      const result = await this.post<AuthenticationResult>("/auth/refresh", { refreshToken: tokens.refreshToken });
       await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
       return result;
     } catch (error) {
@@ -86,7 +87,14 @@ export class AuthClient {
     return result;
   }
   private async post<T>(path: string, body: unknown, auth = false): Promise<T> { return this.request<T>(path, { method: "POST", body, auth }); }
-  private resolve(path: string): string { if (/^https?:\/\//i.test(path)) return path; return `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`; }
+  private resolve(path: string, authenticated: boolean): string {
+    if (!/^https?:\/\//i.test(path)) return `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+    const url = new URL(path);
+    if (authenticated && url.origin !== new URL(this.baseUrl).origin) {
+      throw new TypeError("Authenticated requests cannot target a different origin");
+    }
+    return url.toString();
+  }
   private async parseResponse<T>(response: Response): Promise<T> {
     const text = await response.text(); let payload: unknown = null; if (text) { try { payload = JSON.parse(text); } catch { payload = text; } }
     if (!response.ok) { const code = this.extractErrorCode(payload); const message = (this.extractErrorMessage(payload) ?? response.statusText) || `HTTP ${response.status}`; throw new AuthClientError(response.status, message, code, payload); }
