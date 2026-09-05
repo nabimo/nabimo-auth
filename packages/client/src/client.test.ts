@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { AuthClient } from "./client.js";
+import { CookieRefreshTransport } from "./refresh-coordinator.js";
 
 function response(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -78,6 +79,16 @@ describe("AuthClient", () => {
     await expect(Promise.all(requests)).resolves.toEqual([{ ok: true }, { ok: true }, { ok: true }]);
     expect(refreshCalls).toBe(1);
     expect(protectedCalls).toBe(6);
+  });
+
+  it("uses cookie credentials and persists only the access token", async () => {
+    const storage = { get: vi.fn().mockResolvedValue({ accessToken: "old" }), set: vi.fn(), clear: vi.fn() };
+    const fetch = vi.fn().mockResolvedValue(response({ user: { id: "user-1", email: "user@example.com" }, sessionId: "session-1", accessToken: "new" }));
+    const client = new AuthClient({ baseUrl: "https://auth.test", storage, fetch, refreshTransport: new CookieRefreshTransport() });
+    await expect(client.refresh()).resolves.toEqual({ user: { id: "user-1", email: "user@example.com" }, sessionId: "session-1", accessToken: "new" });
+    expect(fetch.mock.calls[0][1]).toMatchObject({ method: "POST", credentials: "include" });
+    expect(fetch.mock.calls[0][1].body).toBeUndefined();
+    expect(storage.set).toHaveBeenCalledWith({ accessToken: "new" });
   });
 
   it("clears tokens when refresh is rejected", async () => {
