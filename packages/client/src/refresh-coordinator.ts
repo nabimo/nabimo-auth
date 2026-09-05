@@ -45,6 +45,7 @@ interface RefreshMessageError {
 type RefreshMessage = RefreshMessageStart | RefreshMessageResult | RefreshMessageError;
 
 const DEFAULT_MAX_MESSAGE_AGE_MS = 30_000;
+const RESULT_WAIT_TIMEOUT_MS = 5_000;
 
 /**
  * Coordinates refreshes across same-origin browser contexts.
@@ -139,11 +140,19 @@ export class BrowserRefreshCoordinator implements RefreshCoordinator {
   private waitForResult(id: string): Promise<{ received: boolean; value?: unknown }> {
     const existing = this.remoteResults.get(id);
     if (existing) {
+      this.remoteResults.delete(id);
       return Promise.resolve(existing.ok ? { received: true, value: existing.value } : { received: false });
     }
 
     return new Promise((resolve) => {
-      this.resolvers.set(id, resolve);
+      const timer = setTimeout(() => {
+        this.resolvers.delete(id);
+        resolve({ received: false });
+      }, RESULT_WAIT_TIMEOUT_MS);
+      this.resolvers.set(id, (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      });
     });
   }
 
