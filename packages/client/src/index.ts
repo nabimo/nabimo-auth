@@ -1,5 +1,5 @@
 export { AuthClient, createAuthClient } from "./client.js";
-export { BearerRefreshTransport, CookieRefreshTransport, InMemoryRefreshCoordinator } from "./refresh-coordinator.js";
+export { BearerRefreshTransport, BrowserRefreshCoordinator, CookieRefreshTransport, InMemoryRefreshCoordinator } from "./refresh-coordinator.js";
 export { MemoryTokenStorage } from "./storage.js";
 export { AuthClientError } from "./types.js";
 export type {
@@ -23,3 +23,4 @@ export type {
   VerificationChallengeResult,
   VerificationResult,
 } from "./types.js";
+export type { WebLockManagerLike } from "./refresh-coordinator.js";
