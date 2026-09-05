@@ -1,7 +1,7 @@
 import { createApp, eventHandler, toNodeListener } from "h3";
 import { createServer } from "node:http";
 import { createPublicKey } from "node:crypto";
-import { AuthService, AccessTokenValidationService, PasswordResetService, RateLimiter, RefreshService, SessionManagementService, TwoFactorService, TwoFactorLoginService, VerificationService } from "@nabimo-auth/core";
+import { AuthService, AccessTokenValidationService, PasswordResetService, RateLimiter, RefreshService, SessionManagementService, TwoFactorService, TwoFactorLoginService, VerificationService, createJwtKeyResolver } from "@nabimo-auth/core";
 import { getDatabaseClient, UserRepository, PrismaSessionStore, PrismaRegistrationTransactionStore, PrismaSessionManagementStore, PrismaRefreshTokenStore, PrismaVerificationStore, PrismaPasswordResetStore, PrismaTwoFactorStore, PrismaTwoFactorLoginStore, PrismaRateLimitStore } from "@nabimo-auth/database";
 import { createAuthRouter, createIpRateLimitMiddleware } from "@nabimo-auth/server";
 import { loadConfig } from "./config.js";
@@ -39,10 +39,11 @@ export function createAuthApp() {
   const loginRateLimiter = new RateLimiter(new PrismaRateLimitStore(db));
   const ipRateLimiter = new RateLimiter(new PrismaRateLimitStore(db));
   const publicKeyPem = createPublicKey(config.jwtPrivateKeyPem).export({ type: "spki", format: "pem" }).toString();
+  const jwtKeyResolver = createJwtKeyResolver({ [config.jwtKeyId]: publicKeyPem });
 
   const auth = new AuthService({ users, sessions, registration, jwtPrivateKeyPem: config.jwtPrivateKeyPem, jwtKeyId: config.jwtKeyId, issuer: config.issuer, audience: config.audience, twoFactorLogin, loginRateLimiter });
   const refresh = new RefreshService({ refreshTokens: refreshTokenStore, jwtPrivateKeyPem: config.jwtPrivateKeyPem, jwtKeyId: config.jwtKeyId, issuer: config.issuer, audience: config.audience });
-  const accessTokens = new AccessTokenValidationService({ publicKeyPem, sessions: sessionManagementStore, issuer: config.issuer, audience: config.audience });
+  const accessTokens = new AccessTokenValidationService({ jwtKeyResolver, sessions: sessionManagementStore, issuer: config.issuer, audience: config.audience });
 
   const app = createApp();
   app.use("/health", eventHandler(() => ({ status: "ok" })));
