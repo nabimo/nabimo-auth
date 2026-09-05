@@ -16,6 +16,12 @@ export interface AccessTokenClaims {
   jti: string;
 }
 
+export type JwtKeyResolver = (keyId: string) => string | undefined;
+
+export function createJwtKeyResolver(keys: Readonly<Record<string, string>>): JwtKeyResolver {
+  return (keyId) => keys[keyId];
+}
+
 const MAX_CLOCK_SKEW_SECONDS = 60;
 
 export function generateJwtKeyPair(): JwtKeyPair {
@@ -37,7 +43,7 @@ export function signAccessToken(claims: AccessTokenClaims, privateKeyPem: string
 
 export function verifyAccessToken(
   token: string,
-  publicKeyPem: string,
+  keyResolver: JwtKeyResolver,
   now = Math.floor(Date.now() / 1000),
 ): AccessTokenClaims | null {
   const parts = token.split(".");
@@ -50,6 +56,9 @@ export function verifyAccessToken(
       kid?: unknown;
     };
     if (header.alg !== "EdDSA" || header.typ !== "JWT" || typeof header.kid !== "string" || !header.kid) return null;
+
+    const publicKeyPem = keyResolver(header.kid);
+    if (!publicKeyPem) return null;
 
     const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8")) as Partial<AccessTokenClaims>;
     const valid = verify(
