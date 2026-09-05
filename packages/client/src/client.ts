@@ -73,11 +73,8 @@ export class AuthClient {
       const refreshRequest = this.refreshTransport.createRequest(tokens?.refreshToken ?? null);
       const result = await this.requestFetch(this.resolve("/auth/refresh", false), refreshRequest);
       const parsed = await this.parseResponse<RefreshResult>(result);
-      if ("refreshToken" in parsed) {
-        await this.storage.set({ accessToken: parsed.accessToken, refreshToken: parsed.refreshToken });
-      } else {
-        await this.storage.set({ accessToken: parsed.accessToken });
-      }
+      if ("refreshToken" in parsed) await this.storage.set({ accessToken: parsed.accessToken, refreshToken: parsed.refreshToken });
+      else await this.storage.set({ accessToken: parsed.accessToken });
       return parsed;
     } catch (error) {
       if (error instanceof AuthClientError && error.status === 401) await this.storage.clear();
@@ -85,7 +82,14 @@ export class AuthClient {
     }
   }
 
-  private async authenticate<T extends AuthenticationResult | PasswordLoginResult>(path: string, body: RegisterRequest | PasswordLoginRequest | TwoFactorLoginRequest): Promise<T> { const result = await this.post<T>(path, body); if ("accessToken" in result && "refreshToken" in result) await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken }); return result; }
+  private async authenticate<T extends AuthenticationResult | PasswordLoginResult>(path: string, body: RegisterRequest | PasswordLoginRequest | TwoFactorLoginRequest): Promise<T> {
+    const result = await this.post<T>(path, body);
+    if ("accessToken" in result) {
+      if ("refreshToken" in result) await this.storage.set({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+      else await this.storage.set({ accessToken: result.accessToken });
+    }
+    return result;
+  }
   private async post<T>(path: string, body: unknown, auth = false): Promise<T> { return this.request<T>(path, { method: "POST", body, auth }); }
   private resolve(path: string, authenticated: boolean): string { if (!/^https?:\/\//i.test(path)) return `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`; const url = new URL(path); if (authenticated && url.origin !== new URL(this.baseUrl).origin) throw new TypeError("Authenticated requests cannot target a different origin"); return url.toString(); }
   private async parseResponse<T>(response: Response): Promise<T> { const text = await response.text(); let payload: unknown = null; if (text) { try { payload = JSON.parse(text); } catch { payload = text; } } if (!response.ok) { const code = this.extractErrorCode(payload); const message = (this.extractErrorMessage(payload) ?? response.statusText) || `HTTP ${response.status}`; throw new AuthClientError(response.status, message, code, payload); } return payload as T; }
