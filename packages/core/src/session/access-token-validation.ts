@@ -1,5 +1,5 @@
 import { authErrors } from "../auth/errors.js";
-import { verifyAccessToken, type AccessTokenClaims } from "../crypto/jwt.js";
+import { verifyAccessToken, type AccessTokenClaims, type JwtKeyResolver } from "../crypto/jwt.js";
 import { DEFAULT_ACCESS_TOKEN_POLICY } from "../auth/token-policy.js";
 import { isActive, type ManagedSessionRecord } from "./management.js";
 
@@ -8,7 +8,7 @@ export interface AccessTokenSessionStore {
 }
 
 export interface AccessTokenValidationConfig {
-  publicKeyPem: string;
+  jwtKeyResolver: JwtKeyResolver;
   sessions: AccessTokenSessionStore;
   issuer?: string;
   audience?: string;
@@ -26,7 +26,7 @@ export class AccessTokenValidationService {
     const nowSeconds = Math.floor(now.getTime() / 1000);
     if (!Number.isSafeInteger(nowSeconds)) throw authErrors.invalidCredentials();
 
-    const claims = verifyAccessToken(token, this.config.publicKeyPem, nowSeconds);
+    const claims = verifyAccessToken(token, this.config.jwtKeyResolver, nowSeconds);
     if (!claims) throw authErrors.invalidCredentials();
 
     const issuer = this.config.issuer ?? DEFAULT_ACCESS_TOKEN_POLICY.issuer;
