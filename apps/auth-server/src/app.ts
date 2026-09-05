@@ -48,7 +48,26 @@ export function createAuthApp() {
   const app = createApp();
   app.use("/health", eventHandler(() => ({ status: "ok" })));
   app.use("/auth", createIpRateLimitMiddleware({ limiter: ipRateLimiter, trustedProxyIps: config.trustedProxyIps, policies: IP_RATE_LIMIT_POLICIES }));
-  app.use("/auth", createAuthRouter({ auth, accessTokens, refresh, sessionManagement, verification, passwordReset, twoFactor, twoFactorLogin, users }).handler);
+  app.use("/auth", createAuthRouter({
+    auth,
+    accessTokens,
+    refresh,
+    sessionManagement,
+    verification,
+    passwordReset,
+    twoFactor,
+    twoFactorLogin,
+    users,
+    refreshCookie: {
+      enabled: config.refreshCookieEnabled,
+      name: config.refreshCookieName,
+      path: config.refreshCookiePath,
+      sameSite: config.refreshCookieSameSite,
+      secure: config.refreshCookieSecure,
+      domain: config.refreshCookieDomain,
+      maxAgeSeconds: config.refreshCookieMaxAgeSeconds,
+    },
+  }).handler);
   return { app, db };
 }
 
