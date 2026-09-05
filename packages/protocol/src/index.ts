@@ -7,6 +7,12 @@ export interface AuthenticationResponse {
   refreshToken: string;
 }
 
+export interface CookieRefreshResponse {
+  user: AuthUserResponse;
+  sessionId: string;
+  accessToken: string;
+}
+
 export interface TwoFactorRequiredResponse {
   twoFactorRequired: true;
   user: AuthUserResponse;
