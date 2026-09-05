@@ -2,7 +2,7 @@ import type { AuthErrorResponse, AuthUserResponse, AuthenticationResponse, Cooki
 import type { RefreshCoordinator, RefreshTransport } from "./refresh-coordinator.js";
 
 export type AuthUser = AuthUserResponse;
-export type AuthenticationResult = AuthenticationResponse;
+export type AuthenticationResult = AuthenticationResponse | CookieRefreshResponse;
 export type RefreshResult = AuthenticationResponse | CookieRefreshResponse;
 export type PasswordLoginResult = PasswordLoginResponse;
 export type TwoFactorRequiredResult = TwoFactorRequiredResponse;
