@@ -15,7 +15,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/PasswordCredentials' }
       responses:
-        '200': { description: User registered and authenticated., content: { application/json: { schema: { $ref: '#/components/schemas/AuthenticationResponse' } } } }
+        '200': { description: User registered and authenticated. In cookie mode the refresh token is set as an HttpOnly cookie and omitted from JSON., content: { application/json: { schema: { oneOf: [{ $ref: '#/components/schemas/AuthenticationResponse' }, { $ref: '#/components/schemas/CookieRefreshResponse' }] } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '409': { $ref: '#/components/responses/AccountAlreadyExists' }
   /auth/login/password:
@@ -27,7 +27,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/PasswordCredentials' }
       responses:
-        '200': { description: User authenticated or a two-factor challenge issued., content: { application/json: { schema: { oneOf: [{ $ref: '#/components/schemas/AuthenticationResponse' }, { $ref: '#/components/schemas/TwoFactorRequiredResponse' }] } } } }
+        '200': { description: User authenticated or a two-factor challenge issued. In cookie mode the refresh token is set as an HttpOnly cookie and omitted from JSON., content: { application/json: { schema: { oneOf: [{ $ref: '#/components/schemas/AuthenticationResponse' }, { $ref: '#/components/schemas/CookieRefreshResponse' }, { $ref: '#/components/schemas/TwoFactorRequiredResponse' }] } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/2fa/login:
@@ -39,20 +39,21 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/TwoFactorLoginRequest' }
       responses:
-        '200': { description: User authenticated after two-factor verification., content: { application/json: { schema: { $ref: '#/components/schemas/AuthenticationResponse' } } } }
+        '200': { description: User authenticated after two-factor verification. In cookie mode the refresh token is set as an HttpOnly cookie and omitted from JSON., content: { application/json: { schema: { oneOf: [{ $ref: '#/components/schemas/AuthenticationResponse' }, { $ref: '#/components/schemas/CookieRefreshResponse' }] } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { description: Two-factor code or recovery code is invalid or the challenge has expired., content: { application/json: { schema: { $ref: '#/components/schemas/ErrorResponse' } } } }
         '501': { $ref: '#/components/responses/NotConfigured' }
   /auth/refresh:
     post:
       operationId: refresh
+      description: Refresh using either the JSON refreshToken body (bearer mode) or the configured HttpOnly refresh cookie (cookie mode). Cookie mode takes precedence when the configured cookie is present.
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema: { $ref: '#/components/schemas/RefreshRequest' }
       responses:
-        '200': { description: Tokens rotated., content: { application/json: { schema: { $ref: '#/components/schemas/AuthenticationResponse' } } } }
+        '200': { description: Tokens rotated. In cookie mode the replacement refresh token is set as an HttpOnly cookie and omitted from JSON., content: { application/json: { schema: { oneOf: [{ $ref: '#/components/schemas/AuthenticationResponse' }, { $ref: '#/components/schemas/CookieRefreshResponse' }] } } } }
         '400': { $ref: '#/components/responses/InvalidRequest' }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/logout:
@@ -60,14 +61,14 @@ paths:
       operationId: logout
       security: [{ bearerAuth: [] }]
       responses:
-        '200': { description: Current session revoked., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
+        '200': { description: Current session revoked. Cookie mode also clears the refresh cookie., content: { application/json: { schema: { $ref: '#/components/schemas/SuccessResponse' } } } }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/logout-all:
     post:
       operationId: logoutAll
       security: [{ bearerAuth: [] }]
       responses:
-        '200': { description: All active sessions revoked., content: { application/json: { schema: { $ref: '#/components/schemas/LogoutAllResponse' } } } }
+        '200': { description: All active sessions revoked. Cookie mode also clears the refresh cookie., content: { application/json: { schema: { $ref: '#/components/schemas/LogoutAllResponse' } } } }
         '401': { $ref: '#/components/responses/InvalidCredentials' }
   /auth/verify/email/request:
     post:
@@ -258,6 +259,13 @@ components:
         sessionId: { type: string }
         accessToken: { type: string }
         refreshToken: { type: string }
+    CookieRefreshResponse:
+      type: object
+      required: [user, sessionId, accessToken]
+      properties:
+        user: { $ref: '#/components/schemas/User' }
+        sessionId: { type: string }
+        accessToken: { type: string }
     SuccessResponse:
       type: object
       required: [success]
@@ -280,7 +288,7 @@ components:
           properties:
             code:
               type: string
-              enum: [INVALID_REQUEST, INVALID_CREDENTIALS, ACCOUNT_ALREADY_EXISTS, INVALID_OTP, OTP_COOLDOWN, OTP_RATE_LIMITED, INVALID_PASSWORD_RESET_TOKEN, TWO_FACTOR_REQUIRED, INVALID_2FA_CODE, NOT_CONFIGURED]
+              enum: [INVALID_REQUEST, INVALID_CREDENTIALS, ACCOUNT_ALREADY_EXISTS, INVALID_OTP, OTP_COOLDOWN, OTP_RATE_LIMITED, RATE_LIMITED, INVALID_PASSWORD_RESET_TOKEN, TWO_FACTOR_REQUIRED, INVALID_2FA_CODE, NOT_CONFIGURED]
   responses:
     InvalidRequest:
       description: Request body is malformed or required fields are missing.
