@@ -1,5 +1,5 @@
 export { AuthClient, createAuthClient } from "./client.js";
-export { InMemoryRefreshCoordinator } from "./refresh-coordinator.js";
+export { BrowserRefreshCoordinator, InMemoryRefreshCoordinator } from "./refresh-coordinator.js";
 export { MemoryTokenStorage } from "./storage.js";
 export { AuthClientError } from "./types.js";
 export type {
