@@ -37,8 +37,14 @@ export class AuthClient {
   async setupTwoFactor(): Promise<TwoFactorSetupResult> { return this.post<TwoFactorSetupResult>("/auth/2fa/setup", {}, true); }
   async enableTwoFactor(code: string): Promise<TwoFactorResult> { return this.post<TwoFactorResult>("/auth/2fa/enable", { code } satisfies TwoFactorCodeRequest, true); }
   async disableTwoFactor(code: string): Promise<TwoFactorResult> { return this.post<TwoFactorResult>("/auth/2fa/disable", { code } satisfies TwoFactorCodeRequest, true); }
-  async logout(): Promise<LogoutResult> { const result = await this.request<LogoutResult>("/auth/logout", { method: "POST", auth: true }); await this.storage.clear(); return result; }
-  async logoutAll(): Promise<LogoutAllResult> { const result = await this.request<LogoutAllResult>("/auth/logout-all", { method: "POST", auth: true }); await this.storage.clear(); return result; }
+  async logout(): Promise<LogoutResult> {
+    try { return await this.request<LogoutResult>("/auth/logout", { method: "POST", auth: true }); }
+    finally { await this.storage.clear(); }
+  }
+  async logoutAll(): Promise<LogoutAllResult> {
+    try { return await this.request<LogoutAllResult>("/auth/logout-all", { method: "POST", auth: true }); }
+    finally { await this.storage.clear(); }
+  }
   async getTokens(): Promise<AuthTokens | null> { return this.storage.get(); }
   async getAccessToken(): Promise<string | null> { return (await this.storage.get())?.accessToken ?? null; }
   async clearTokens(): Promise<void> { await this.storage.clear(); }
