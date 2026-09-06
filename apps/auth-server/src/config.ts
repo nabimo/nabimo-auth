@@ -47,6 +47,14 @@ function sameSiteEnv(): "Strict" | "Lax" | "None" {
 export function loadConfig(): AuthServerConfig {
   const refreshCookieSameSite = sameSiteEnv();
   const refreshCookieSecure = booleanEnv("NABIMO_REFRESH_COOKIE_SECURE", true);
+  const refreshCookieEnabled = booleanEnv("NABIMO_REFRESH_COOKIE_ENABLED", false);
+  const refreshCookieAllowedOrigins = (process.env.NABIMO_REFRESH_COOKIE_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  if (refreshCookieSameSite === "None" && refreshCookieEnabled && refreshCookieAllowedOrigins.length === 0) {
+    throw new Error("NABIMO_REFRESH_COOKIE_ALLOWED_ORIGINS must contain at least one origin when cookie mode uses SameSite=None");
+  }
   if (refreshCookieSameSite === "None" && !refreshCookieSecure) throw new Error("NABIMO_REFRESH_COOKIE_SECURE must be true when SameSite=None");
 
   return {
@@ -60,16 +68,13 @@ export function loadConfig(): AuthServerConfig {
       .split(",")
       .map((value) => value.trim())
       .filter(Boolean),
-    refreshCookieEnabled: booleanEnv("NABIMO_REFRESH_COOKIE_ENABLED", false),
+    refreshCookieEnabled,
     refreshCookieName: process.env.NABIMO_REFRESH_COOKIE_NAME ?? "nabimo_refresh",
     refreshCookiePath: process.env.NABIMO_REFRESH_COOKIE_PATH ?? "/auth/refresh",
     refreshCookieSameSite,
     refreshCookieSecure,
     refreshCookieDomain: process.env.NABIMO_REFRESH_COOKIE_DOMAIN || undefined,
     refreshCookieMaxAgeSeconds: positiveIntegerEnv("NABIMO_REFRESH_COOKIE_MAX_AGE_SECONDS", 30 * 24 * 60 * 60),
-    refreshCookieAllowedOrigins: (process.env.NABIMO_REFRESH_COOKIE_ALLOWED_ORIGINS ?? "")
-      .split(",")
-      .map((value) => value.trim())
-      .filter(Boolean),
+    refreshCookieAllowedOrigins,
   };
 }
