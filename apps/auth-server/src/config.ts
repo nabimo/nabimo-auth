@@ -19,6 +19,7 @@ export interface AuthServerConfig {
   refreshCookieSecure: boolean;
   refreshCookieDomain?: string;
   refreshCookieMaxAgeSeconds: number;
+  refreshCookieAllowedOrigins: string[];
 }
 
 function booleanEnv(name: string, fallback: boolean): boolean {
@@ -66,5 +67,9 @@ export function loadConfig(): AuthServerConfig {
     refreshCookieSecure,
     refreshCookieDomain: process.env.NABIMO_REFRESH_COOKIE_DOMAIN || undefined,
     refreshCookieMaxAgeSeconds: positiveIntegerEnv("NABIMO_REFRESH_COOKIE_MAX_AGE_SECONDS", 30 * 24 * 60 * 60),
+    refreshCookieAllowedOrigins: (process.env.NABIMO_REFRESH_COOKIE_ALLOWED_ORIGINS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
   };
 }
