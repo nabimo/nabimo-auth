@@ -18,7 +18,8 @@ export function createRefreshCookieOriginMiddleware(options: RefreshCookieOrigin
   }
 
   return eventHandler((event) => {
-    if (options.enabled !== true || sameSite !== "None" || !hasCookie(event, cookieName)) return;
+    const path = event.path.startsWith("/auth/") ? event.path.slice("/auth".length) : event.path;
+    if (path !== "/refresh" || options.enabled !== true || sameSite !== "None" || !hasCookie(event, cookieName)) return;
 
     const origin = getHeader(event, "origin");
     if (!isAllowedOrigin(origin, allowedOrigins)) {
