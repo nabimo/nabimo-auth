@@ -3,7 +3,7 @@ import { createServer } from "node:http";
 import { createPublicKey } from "node:crypto";
 import { AuthService, AccessTokenValidationService, PasswordResetService, RateLimiter, RefreshService, SessionManagementService, TwoFactorService, TwoFactorLoginService, VerificationService, createJwtKeyResolver } from "@nabimo-auth/core";
 import { getDatabaseClient, UserRepository, PrismaSessionStore, PrismaRegistrationTransactionStore, PrismaSessionManagementStore, PrismaRefreshTokenStore, PrismaVerificationStore, PrismaPasswordResetStore, PrismaTwoFactorStore, PrismaTwoFactorLoginStore, PrismaRateLimitStore } from "@nabimo-auth/database";
-import { createAuthRouter, createIpRateLimitMiddleware } from "@nabimo-auth/server";
+import { createAuthRouter, createIpRateLimitMiddleware, createRefreshCookieOriginMiddleware } from "@nabimo-auth/server";
 import { loadConfig } from "./config.js";
 import { ConsoleVerificationCodeSender } from "./verification-sender.js";
 import { ConsolePasswordResetSender } from "./password-reset-sender.js";
@@ -48,6 +48,12 @@ export function createAuthApp() {
   const app = createApp();
   app.use("/health", eventHandler(() => ({ status: "ok" })));
   app.use("/auth", createIpRateLimitMiddleware({ limiter: ipRateLimiter, trustedProxyIps: config.trustedProxyIps, policies: IP_RATE_LIMIT_POLICIES }));
+  app.use("/auth", createRefreshCookieOriginMiddleware({
+    enabled: config.refreshCookieEnabled,
+    cookieName: config.refreshCookieName,
+    sameSite: config.refreshCookieSameSite,
+    allowedOrigins: config.refreshCookieAllowedOrigins,
+  }));
   app.use("/auth", createAuthRouter({
     auth,
     accessTokens,
